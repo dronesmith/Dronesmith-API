@@ -85,6 +85,18 @@ func NewVehicle(address, remote string) *Vehicle {
   return vehicle
 }
 
+func (v *Vehicle) GetParams() {
+  v.sendMAVLink(v.api.RequestParamsList())
+}
+
+func (v *Vehicle) GetParam(name string) {
+
+}
+
+func (v *Vehicle) SetParam(name string) {
+
+}
+
 func (v *Vehicle) Listen() {
 
   // Check systems are online
@@ -116,13 +128,56 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
   }
 }
 
+func (v *Vehicle) sysOnlineHandler() {
+  // Main system handler if the init was completed.
+  log.Println("System online handler.")
+}
+
+//
+// Basically the init has 3 steps:
+// 1, ensure we're online
+// 2, got vehicle capabilities
+// 3, have all the vehicle params.
+// After we've passed these three things, we're good to go.
+//
 func (v *Vehicle) stateHandler() {
   for {
-    switch v.state {
-    case INIT:
+    online := v.api.SysOnline()
+    caps := v.api.SysGotCaps()
+
+    // only do stuff if we're online
+    if online {
+      if !caps {
+        // Get caps
+        v.sendMAVLink(v.api.RequestVehicleInfo())
+        log.Println("Fetching caps...")
+      } else {
+        if !v.api.ParamsInit() {
+          log.Println("Fetching params...")
+          v.GetParams()
+        } else {
+          if found, missing := v.api.CheckParams(); found {
+            // We're fully initialized!
+            v.sysOnlineHandler()
+          } else if !found {
+            // Don't have all of them, invidually request the params we don't have.
+            for e := range missing {
+              v.sendMAVLink(v.api.RequestParam(uint(e)))
+              // wait a teensy bit to give the firmware time to receive
+              time.Sleep(2 * time.Millisecond)
+            }
+          }
+        }
+      }
+    } else {
+      // Remove stale data
+      // NOTE we purposely keep most of the telemetry data to preserve the drone's
+      // last live state. We only remove internal MAVLink information like params
+      // and caps.
+      v.api.Scrub()
     }
 
-    time.Sleep(1 * time.Second)
+    time.Sleep(200 * time.Millisecond)
   }
 }
 
@@ -146,7 +201,6 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     err := m.Unpack(p)
     mavParseError(err)
     v.api.UpdateFromHeartbeat(&m)
-    v.sendMAVLink(v.api.RequestVehicleInfo())
     v.knownMsgs[m.MsgName()] = &m
 
   case mavlink.MSG_ID_SYS_STATUS:
@@ -283,6 +337,13 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     err := m.Unpack(p)
     mavParseError(err)
     v.api.UpdateFromAutopilotVersion(&m)
+    v.knownMsgs[m.MsgName()] = &m
+
+  case mavlink.MSG_ID_PARAM_VALUE:
+    var m mavlink.ParamValue
+    err := m.Unpack(p)
+    mavParseError(err)
+    v.api.UpdateFromParam(&m)
     v.knownMsgs[m.MsgName()] = &m
 
   default:
