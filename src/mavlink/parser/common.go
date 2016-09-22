@@ -325,7 +325,7 @@ const (
 	MAV_CMD_START_RX_PAIR                  = 69  // Starts receiver pairing
 	MAV_CMD_GET_MESSAGE_INTERVAL           = 70  // Request the interval between messages for a particular MAVLink message ID
 	MAV_CMD_SET_MESSAGE_INTERVAL           = 71  // Request the interval between messages for a particular MAVLink message ID. This interface replaces REQUEST_DATA_STREAM
-	MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES = 72  // Request autopilot capabilities
+	MAV_CMD_REQUEST_AUTOPILOT_CAPABILITIES = 520  // Request autopilot capabilities
 	MAV_CMD_IMAGE_START_CAPTURE            = 73  // Start image capture sequence
 	MAV_CMD_IMAGE_STOP_CAPTURE             = 74  // Stop image capture sequence
 	MAV_CMD_DO_TRIGGER_CONTROL             = 75  // Enable or disable on-board camera triggering system.
@@ -531,11 +531,11 @@ const (
 	MAV_PROTOCOL_CAPABILITY_FTP                            = 32  // Autopilot supports the new FILE_TRANSFER_PROTOCOL message type.
 	MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET            = 64  // Autopilot supports commanding attitude offboard.
 	MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED  = 128 // Autopilot supports commanding position and velocity targets in local NED frame.
-	MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT = 8   // Autopilot supports commanding position and velocity targets in global scaled integers.
-	MAV_PROTOCOL_CAPABILITY_TERRAIN                        = 9   // Autopilot supports terrain protocol / data handling.
-	MAV_PROTOCOL_CAPABILITY_SET_ACTUATOR_TARGET            = 10  // Autopilot supports direct actuator control.
-	MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION             = 11  // Autopilot supports the flight termination command.
-	MAV_PROTOCOL_CAPABILITY_COMPASS_CALIBRATION            = 12  // Autopilot supports onboard compass calibration.
+	MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT = 256   // Autopilot supports commanding position and velocity targets in global scaled integers.
+	MAV_PROTOCOL_CAPABILITY_TERRAIN                        = 512   // Autopilot supports terrain protocol / data handling.
+	MAV_PROTOCOL_CAPABILITY_SET_ACTUATOR_TARGET            = 1024  // Autopilot supports direct actuator control.
+	MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION             = 2048  // Autopilot supports the flight termination command.
+	MAV_PROTOCOL_CAPABILITY_COMPASS_CALIBRATION            = 4096  // Autopilot supports onboard compass calibration.
 )
 
 // MavEstimatorType: Enumeration of estimator types
