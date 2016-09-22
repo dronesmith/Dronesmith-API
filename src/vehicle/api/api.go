@@ -768,7 +768,7 @@ func (v *VehicleApi) CheckParams() (bool, []uint) {
   v.lock.RLock()
   defer v.lock.RUnlock()
 
-  neededParams := make([]uint, 1)
+  var neededParams []uint
 
   sum := 0
   for k, e := range v.params {
