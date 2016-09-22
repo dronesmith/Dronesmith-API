@@ -24,6 +24,8 @@ type Vehicle struct {
 
   commandQueue  *utils.PQueue
   queueLock     sync.RWMutex
+
+  ParamsTimer   time.Time
 }
 
 func checkError(err error) {
@@ -174,11 +176,17 @@ func (v *Vehicle) stateHandler() {
         if !v.api.ParamsInit() {
           log.Println("Fetching params...")
           v.GetParams()
+          v.ParamsTimer = time.Now()
         } else {
-          if found, missing := v.api.CheckParams(); found {
+          if found, missing := v.api.CheckParams(); found || v.api.ParamForced() {
             // We're fully initialized!
             v.sysOnlineHandler()
           } else if !found {
+            if time.Now().Sub(v.ParamsTimer) > 8 * time.Second {
+              log.Println("WARN Missing params: ", missing)
+              v.api.ForceParamInit()
+            }
+
             // Don't have all of them, invidually request the params we don't have.
             for e := range missing {
               v.sendMAVLink(v.api.RequestParam(uint(e)))
@@ -196,7 +204,7 @@ func (v *Vehicle) stateHandler() {
       v.api.Scrub()
     }
 
-    time.Sleep(200 * time.Millisecond)
+    time.Sleep(500 * time.Millisecond)
   }
 }
 

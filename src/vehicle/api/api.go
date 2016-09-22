@@ -189,6 +189,7 @@ type VehicleApi struct {
   params    map[uint]*Param
   totalParams uint
   paramsRequested bool
+  paramForceInit bool
 
   lock      sync.RWMutex
 }
@@ -203,6 +204,7 @@ func NewVehicleApi(id string) *VehicleApi {
   api.params = nil
   api.totalParams = 0
   api.paramsRequested = false
+  api.paramForceInit = false
   return api
 }
 
@@ -766,7 +768,7 @@ func (v *VehicleApi) CheckParams() (bool, []uint) {
   v.lock.RLock()
   defer v.lock.RUnlock()
 
-  neededParams := make([]uint, 8)
+  neededParams := make([]uint, 1)
 
   sum := 0
   for k, e := range v.params {
@@ -778,6 +780,20 @@ func (v *VehicleApi) CheckParams() (bool, []uint) {
   }
 
   return !(uint(sum) < v.totalParams), neededParams
+}
+
+func (v *VehicleApi) ForceParamInit() {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+
+  v.paramForceInit = true
+}
+
+func (v *VehicleApi) ParamForced() bool {
+  v.lock.RLock()
+  defer v.lock.RUnlock()
+
+  return v.paramForceInit
 }
 
 func (v *VehicleApi) UpdateFromParam(m *mavlink.ParamValue) {
