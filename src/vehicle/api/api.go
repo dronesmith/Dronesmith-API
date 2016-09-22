@@ -11,6 +11,7 @@ import (
   "math"
 
   "mavlink/parser"
+  "utils"
 )
 
 //
@@ -149,6 +150,13 @@ type Param struct {
   Value    float32 // Even though params can be different values, we always normalize them to a float.
   Encode   uint8 // used to encode the param for MAVLink
 }
+
+type VehicleCommand struct {
+  Status    uint
+  TimesSent uint
+  Command   *mavlink.CommandLong
+}
+
 
 //
 // Main Vehicle API struct
@@ -340,15 +348,15 @@ func (v *VehicleApi) UpdateFromHeartbeat(m *mavlink.Heartbeat) {
   if m.CustomMode & 0x00FF0000 == 0x010000 {
     v.mode = "Manual"
   } else if m.CustomMode & 0x00FF0000 == 0x020000 {
-    v.mode = "Altitude Hold"
+    v.mode = "Altitude"
   } else if m.CustomMode & 0x00FF0000 == 0x030000 {
-    v.mode = "Position Hold"
+    v.mode = "Position"
   } else if m.CustomMode & 0x00FF0000 == 0x050000 {
     v.mode = "Acro"
   } else if m.CustomMode & 0x00FF0000 == 0x060000 {
     v.mode = "Offboard"
   } else if m.CustomMode & 0x00FF0000 == 0x070000 {
-    v.mode = "Stabilization"
+    v.mode = "Stabilized"
   } else if m.CustomMode & 0x00FF0000 == 0x080000 {
     v.mode = "RAttitude"
   } else if m.CustomMode & 0x00FF0000 == 0x000100 {
@@ -356,17 +364,17 @@ func (v *VehicleApi) UpdateFromHeartbeat(m *mavlink.Heartbeat) {
   } else if m.CustomMode & 0xFF000000 == 0x02000000 {
     v.mode = "Takeoff"
   } else if m.CustomMode & 0xFF000000 == 0x03000000 {
-    v.mode = "Loiter"
+    v.mode = "Hold"
   } else if m.CustomMode & 0xFF000000 == 0x04000000 {
     v.mode = "Mission"
   } else if m.CustomMode & 0xFF000000 == 0x05000000 {
-    v.mode = "Return To Landing"
+    v.mode = "RTL"
   } else if m.CustomMode & 0xFF000000 == 0x06000000 {
     v.mode = "Land"
   } else if m.CustomMode & 0xFF000000 == 0x07000000 {
     v.mode = "RTGS"
   } else if m.CustomMode & 0xFF000000 == 0x08000000 {
-    v.mode = "Follow Target"
+    v.mode = "Follow"
   } else {
     v.mode = "Unknown Flight Mode"
   }
@@ -675,14 +683,29 @@ func (v *VehicleApi) PrintCapabilities() {
   }
 }
 
-func (v *VehicleApi) UpdateFromAck(m *mavlink.CommandAck) {
+func (v *VehicleApi) UpdateFromAck(m *mavlink.CommandAck, queue *utils.PQueue) {
+  if queue.Size() > 0 {
+    cmdInt, pri := queue.Head()
+    cmd := cmdInt.(*VehicleCommand)
+
+    // Only update if they are the same command.
+    if pri == int(m.Command) {
+      cmd.Status = uint(m.Result)
+    }
+  }
+
   switch m.Result {
-  case mavlink.MAV_RESULT_ACCEPTED: log.Println("Command Accepted:", m.Command)
-  case mavlink.MAV_RESULT_TEMPORARILY_REJECTED: log.Println("Command Rejected:", m.Command)
-  case mavlink.MAV_RESULT_DENIED: log.Println("Command Can not be completed:", m.Command)
+  case mavlink.MAV_RESULT_ACCEPTED:
+    log.Println("Command Accepted:", m.Command)
+  case mavlink.MAV_RESULT_TEMPORARILY_REJECTED:
+    log.Println("Command Rejected:", m.Command)
+  case mavlink.MAV_RESULT_DENIED:
+    log.Println("Command Can not be completed:", m.Command)
   default: fallthrough
-  case mavlink.MAV_RESULT_UNSUPPORTED: log.Println("Command Unknown:", m.Command)
-  case mavlink.MAV_RESULT_FAILED: log.Println("Tried to execute command, but failed", m.Command)
+  case mavlink.MAV_RESULT_UNSUPPORTED:
+    log.Println("Command Unknown:", m.Command)
+  case mavlink.MAV_RESULT_FAILED:
+    log.Println("Tried to execute command, but failed", m.Command)
   }
 }
 

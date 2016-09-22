@@ -5,19 +5,11 @@ import (
   "log"
   "os"
   "time"
+  "utils"
+  "sync"
 
   "mavlink/parser"
   "vehicle/api"
-)
-
-type VehicleState int
-const (
-  INIT VehicleState = iota
-  GETCAPS
-  GETPARAMS
-  CONNECTED
-  RECORDING
-  REPLAY
 )
 
 type Vehicle struct {
@@ -27,9 +19,11 @@ type Vehicle struct {
   mavlinkWriter *mavlink.Encoder
 
   api           *api.VehicleApi
-  state         VehicleState
   knownMsgs     map[string]mavlink.Message
   unknownMsgs   map[uint8]*mavlink.Packet
+
+  commandQueue  *utils.PQueue
+  queueLock     sync.RWMutex
 }
 
 func checkError(err error) {
@@ -50,7 +44,6 @@ func NewVehicle(address, remote string) *Vehicle {
   vehicle := &Vehicle{}
 
   vehicle.api = api.NewVehicleApi("1")
-  vehicle.state = INIT
   vehicle.knownMsgs = make(map[string]mavlink.Message)
   vehicle.unknownMsgs = make(map[uint8]*mavlink.Packet)
 
@@ -62,6 +55,10 @@ func NewVehicle(address, remote string) *Vehicle {
   vehicle.api.AddSubSystem("OpticalFlow")
   vehicle.api.AddSubSystem("RangeFinder")
   vehicle.api.AddSubSystem("IMU")
+
+  // Commands are prioritized by their op number -- those with lower numbers
+  // like NAV commands get prioritized first.
+  vehicle.commandQueue = utils.NewPQueue(utils.MINPQ)
 
   vehicle.address, err = net.ResolveUDPAddr("udp", address)
   checkError(err)
@@ -129,8 +126,30 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 }
 
 func (v *Vehicle) sysOnlineHandler() {
+  v.queueLock.Lock()
+  defer v.queueLock.Unlock()
   // Main system handler if the init was completed.
-  log.Println("System online handler.")
+
+  // Check command Queue
+  if v.commandQueue.Size() > 0 {
+    cmdInt, _ := v.commandQueue.Head()
+    cmd := cmdInt.(*api.VehicleCommand)
+    if cmd.Status == mavlink.MAV_RESULT_ACCEPTED {
+      // got a valid ack, dequeue and send next item
+      v.commandQueue.Pop()
+    } else if cmd.Status == mavlink.MAV_RESULT_DENIED ||
+      cmd.Status == mavlink.MAV_RESULT_UNSUPPORTED ||
+      cmd.Status == mavlink.MAV_RESULT_FAILED {
+      // Command is simply not supported. Throw it out and send next item.
+      v.commandQueue.Pop()
+    } else if cmd.TimesSent > 5 {
+      // We tried 5 times, but got no ack, so throw it out and send next item.
+      v.commandQueue.Pop()
+    } else {
+      v.sendMAVLink(cmd.Command)
+      cmd.TimesSent += 1
+    }
+  }
 }
 
 //
@@ -164,7 +183,7 @@ func (v *Vehicle) stateHandler() {
             for e := range missing {
               v.sendMAVLink(v.api.RequestParam(uint(e)))
               // wait a teensy bit to give the firmware time to receive
-              time.Sleep(2 * time.Millisecond)
+              time.Sleep(5 * time.Millisecond)
             }
           }
         }
@@ -202,6 +221,7 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     mavParseError(err)
     v.api.UpdateFromHeartbeat(&m)
     v.knownMsgs[m.MsgName()] = &m
+    v.SetMode("Hold", false)
 
   case mavlink.MSG_ID_SYS_STATUS:
     var m mavlink.SysStatus
@@ -329,7 +349,9 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     var m mavlink.CommandAck
     err := m.Unpack(p)
     mavParseError(err)
-    v.api.UpdateFromAck(&m)
+    v.commandQueue.RLock()
+    v.api.UpdateFromAck(&m, v.commandQueue)
+    v.commandQueue.RUnlock()
     v.knownMsgs[m.MsgName()] = &m
 
   case mavlink.MSG_ID_AUTOPILOT_VERSION:
@@ -349,4 +371,73 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
   default:
     v.unknownMsgs[p.MsgID] = p
   }
+}
+
+func (v *Vehicle) SetMode(mode string, armed bool) {
+  v.queueLock.Lock()
+  defer v.queueLock.Unlock()
+
+  var mainMode uint
+  var manualMode uint
+  var autoMode uint
+
+  mainMode = mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
+  if armed {
+    mainMode |= mavlink.MAV_MODE_FLAG_SAFETY_ARMED
+  }
+
+  switch mode {
+  case "Manual":
+    mainMode |=
+      mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 1
+  case "Stabilized":
+    mainMode |=
+      mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 7
+  case "Acro":
+    mainMode |= mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED
+    manualMode = 5
+  case "RAttitude":
+    mainMode |=
+      mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 8
+  case "Altitude":
+    mainMode |=
+      mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED
+    manualMode = 2
+  case "Position":
+    mainMode |=
+      mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED
+    manualMode = 3
+  case "Hold":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 3
+  case "Follow":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 8
+  case "RTL":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 5
+  case "Takeoff":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 3
+  case "Mission":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 4
+  }
+
+  cmd := &api.VehicleCommand{
+    Status: 10, // Must be greater than 4 due to MAV_RESULT
+    TimesSent: 0,
+    Command: v.api.PackComandLong(mavlink.MAV_CMD_DO_SET_MODE,
+      [7]float32{float32(mainMode), float32(manualMode), float32(autoMode)}),
+  }
+
+  v.commandQueue.Push(cmd, mavlink.MAV_CMD_DO_SET_MODE)
 }
