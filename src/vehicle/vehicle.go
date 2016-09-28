@@ -6,7 +6,6 @@ import (
   "os"
   "time"
   "utils"
-  "sync"
 
   "mavlink/parser"
   "vehicle/api"
@@ -23,7 +22,7 @@ type Vehicle struct {
   unknownMsgs   map[uint8]*mavlink.Packet
 
   commandQueue  *utils.PQueue
-  queueLock     sync.RWMutex
+  syslogQueue   *utils.Deque
 
   ParamsTimer   time.Time
 }
@@ -61,6 +60,7 @@ func NewVehicle(address, remote string) *Vehicle {
   // Commands are prioritized by their op number -- those with lower numbers
   // like NAV commands get prioritized first.
   vehicle.commandQueue = utils.NewPQueue(utils.MINPQ)
+  vehicle.syslogQueue = utils.NewCappedDeque(200)
 
   vehicle.address, err = net.ResolveUDPAddr("udp", address)
   checkError(err)
@@ -128,8 +128,6 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 }
 
 func (v *Vehicle) sysOnlineHandler() {
-  v.queueLock.Lock()
-  defer v.queueLock.Unlock()
   // Main system handler if the init was completed.
 
   // Check command Queue
@@ -182,7 +180,7 @@ func (v *Vehicle) stateHandler() {
             // We're fully initialized!
             v.sysOnlineHandler()
           } else if !found {
-            if time.Now().Sub(v.ParamsTimer) > 8 * time.Second {
+            if time.Now().Sub(v.ParamsTimer) > 10 * time.Second {
               log.Println("WARN Missing params: ", missing)
               v.api.ForceParamInit()
             }
@@ -229,7 +227,7 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     mavParseError(err)
     v.api.UpdateFromHeartbeat(&m)
     v.knownMsgs[m.MsgName()] = &m
-    v.SetMode("Hold", false)
+    v.SetMode("Hold", true)
 
   case mavlink.MSG_ID_SYS_STATUS:
     var m mavlink.SysStatus
@@ -376,14 +374,24 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     v.api.UpdateFromParam(&m)
     v.knownMsgs[m.MsgName()] = &m
 
+  case mavlink.MSG_ID_STATUSTEXT:
+    var m mavlink.Statustext
+    err := m.Unpack(p)
+    mavParseError(err)
+    v.knownMsgs[m.MsgName()] = &m
+    log.Println(">>>", string(m.Text[:]))
+    v.syslogQueue.Prepend(&api.VehicleLog{
+      Msg: string(m.Text[:]),
+      Time: time.Now(),
+      Level: uint(m.Severity),
+    })
+
   default:
     v.unknownMsgs[p.MsgID] = p
   }
 }
 
 func (v *Vehicle) SetMode(mode string, armed bool) {
-  v.queueLock.Lock()
-  defer v.queueLock.Unlock()
 
   var mainMode uint
   var manualMode uint
@@ -448,4 +456,13 @@ func (v *Vehicle) SetMode(mode string, armed bool) {
   }
 
   v.commandQueue.Push(cmd, mavlink.MAV_CMD_DO_SET_MODE)
+}
+
+func (v *Vehicle) GetSysLog() []*api.VehicleLog {
+  var log []*api.VehicleLog
+  for !v.syslogQueue.Empty() {
+    val := v.syslogQueue.Pop()
+    log = append(log, val.(*api.VehicleLog))
+  }
+  return log
 }

@@ -157,6 +157,12 @@ type VehicleCommand struct {
   Command   *mavlink.CommandLong
 }
 
+type VehicleLog struct {
+  Msg       string
+  Time      time.Time
+  Level     uint
+}
+
 
 //
 // Main Vehicle API struct
