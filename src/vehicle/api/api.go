@@ -145,8 +145,7 @@ type SubSystem struct {
 }
 
 type Param struct {
-  Name     string
-  Loaded   bool
+  Index    uint
   Value    float32 // Even though params can be different values, we always normalize them to a float.
   Encode   uint8 // used to encode the param for MAVLink
 }
@@ -192,7 +191,7 @@ type VehicleApi struct {
   caps      uint64  // Capbilities Mask
   fmuGit    string  // Git hash for FMU firmware
   gotCaps   bool
-  params    map[uint]*Param
+  params    map[string]*Param
   totalParams uint
   paramsRequested bool
   paramForceInit bool
@@ -207,7 +206,7 @@ func NewVehicleApi(id string) *VehicleApi {
   api.created = time.Now()
   api.lock = sync.RWMutex{}
   api.subSystems = make(map[string]*SubSystem)
-  api.params = nil
+  api.params = make(map[string]*Param)
   api.totalParams = 0
   api.paramsRequested = false
   api.paramForceInit = false
@@ -235,6 +234,18 @@ func (v *VehicleApi) UpdateSubSystem(name string) error {
     subsystem.Updated = time.Now()
     return nil
   }
+}
+
+func (v *VehicleApi) IsArmed() bool {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+  return v.status.Armed;
+}
+
+func (v *VehicleApi) Mode() string {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+  return string(v.mode);
 }
 
 func (v *VehicleApi) CheckSubSystems() {
@@ -742,6 +753,17 @@ func (v *VehicleApi) RequestParam(param uint) *mavlink.ParamRequestRead {
   }
 }
 
+func (v *VehicleApi) GetParam(param string) (float32, error) {
+  v.lock.RLock()
+  defer v.lock.RUnlock()
+
+  if p, f := v.params[param]; f {
+    return p.Value, nil
+  } else {
+    return 0.0, fmt.Errorf("Param not found.")
+  }
+}
+
 func (v *VehicleApi) SetParam(param string, value float32) *mavlink.ParamSet {
   // convert to [16]byte
   var uid [16]byte = [16]byte{0}
@@ -750,8 +772,8 @@ func (v *VehicleApi) SetParam(param string, value float32) *mavlink.ParamSet {
   }
 
   var enc uint8
-  for _, e := range v.params {
-    if e.Name == param {
+  for k, e := range v.params {
+    if k == param {
       enc = e.Encode
     }
   }
@@ -770,22 +792,17 @@ func (v *VehicleApi) ParamsInit() bool {
   return v.paramsRequested
 }
 
-func (v *VehicleApi) CheckParams() (bool, []uint) {
+func (v *VehicleApi) CheckParams() (uint, map[uint]bool) {
   v.lock.RLock()
   defer v.lock.RUnlock()
 
-  var neededParams []uint
+  gotParams := make(map[uint]bool)
 
-  sum := 0
-  for k, e := range v.params {
-    if e != nil && e.Loaded {
-      sum += 1
-    } else {
-      neededParams = append(neededParams, k)
-    }
+  for _, e := range v.params {
+    gotParams[e.Index] = true
   }
 
-  return !(uint(sum) < v.totalParams), neededParams
+  return v.totalParams, gotParams
 }
 
 func (v *VehicleApi) ForceParamInit() {
@@ -814,19 +831,19 @@ func (v *VehicleApi) UpdateFromParam(m *mavlink.ParamValue) {
 
   v.totalParams = uint(m.ParamCount)
 
-  // We don't know the size of params till now, so we need to init this map here.
-  if v.params == nil {
-    v.params = make(map[uint]*Param)
-    for i := 0; i < int(m.ParamCount); i += 1 {
-      v.params[uint(i)] = &Param{
-        "", false, 0.0, 0,
-      }
+  // we need to deep copy the param string, to avoid copying over nils
+  str := ""
+  for _, c := range m.ParamId {
+    str += string(c)
+    if c == 0 {
+      break
     }
   }
 
-  v.params[uint(m.ParamIndex)] = &Param{
-    string(m.ParamId[:]),
-    true,
+  log.Println(m.ParamIndex, str)
+
+  v.params[str] = &Param{
+    uint(m.ParamIndex),
     m.ParamValue,
     m.ParamType,
   }

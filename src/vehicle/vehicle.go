@@ -129,6 +129,7 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 
 func (v *Vehicle) sysOnlineHandler() {
   // Main system handler if the init was completed.
+  v.Up(0.8)
 
   // Check command Queue
   if v.commandQueue.Size() > 0 {
@@ -176,18 +177,20 @@ func (v *Vehicle) stateHandler() {
           v.GetParams()
           v.ParamsTimer = time.Now()
         } else {
-          if found, missing := v.api.CheckParams(); found || v.api.ParamForced() {
+          if total, foundSet := v.api.CheckParams(); len(foundSet) == int(total) || v.api.ParamForced() {
             // We're fully initialized!
             v.sysOnlineHandler()
-          } else if !found {
-            if time.Now().Sub(v.ParamsTimer) > 10 * time.Second {
-              log.Println("WARN Missing params: ", missing)
+          } else {
+            if time.Now().Sub(v.ParamsTimer) > 20 * time.Second {
+              log.Println("WARN Only got the following params: ", foundSet)
               v.api.ForceParamInit()
             }
 
             // Don't have all of them, invidually request the params we don't have.
-            for e := range missing {
-              v.sendMAVLink(v.api.RequestParam(uint(e)))
+            for i := 0; i < int(total); i++ {
+              if _, f := foundSet[uint(i)]; !f {
+                v.sendMAVLink(v.api.RequestParam(uint(i)))
+              }
               // wait a teensy bit to give the firmware time to receive
               time.Sleep(5 * time.Millisecond)
             }
@@ -227,7 +230,6 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     mavParseError(err)
     v.api.UpdateFromHeartbeat(&m)
     v.knownMsgs[m.MsgName()] = &m
-    v.SetMode("Hold", true)
 
   case mavlink.MSG_ID_SYS_STATUS:
     var m mavlink.SysStatus
@@ -391,18 +393,34 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
   }
 }
 
-func (v *Vehicle) SetMode(mode string, armed bool) {
+func (v *Vehicle) SetModeAndArm(updateMode, updateArm bool, mode string, armed bool) {
 
   var mainMode uint
   var manualMode uint
   var autoMode uint
 
   mainMode = mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
-  if armed {
+  if v.api.IsArmed() {
     mainMode |= mavlink.MAV_MODE_FLAG_SAFETY_ARMED
   }
 
-  switch mode {
+  if updateArm {
+    if armed {
+      mainMode |= mavlink.MAV_MODE_FLAG_SAFETY_ARMED
+    } else {
+      mainMode = mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
+    }
+  }
+
+  var tempMode string
+
+  if updateMode {
+    tempMode = mode
+  } else {
+    tempMode = v.api.Mode()
+  }
+
+  switch tempMode {
   case "Manual":
     mainMode |=
       mavlink.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
@@ -465,4 +483,40 @@ func (v *Vehicle) GetSysLog() []*api.VehicleLog {
     log = append(log, val.(*api.VehicleLog))
   }
   return log
+}
+
+//
+// Turtle
+//
+
+func (v *Vehicle) preparePosCtrl(rate float32) float32 {
+  normal := rate
+  if normal > 1.0 {
+    normal = 1.0
+  }
+
+  if normal < 0 {
+    normal = 0.0
+  }
+
+  if v.api.Mode() != "Position" {
+    v.SetModeAndArm(true, false, "Position", false)
+  }
+
+  if !v.api.IsArmed() {
+    v.SetModeAndArm(true, false, "Position", false)
+  }
+
+  return normal
+}
+
+func (v *Vehicle) getRCMappings(kind string) {
+  param := "RC_MAP_"+kind
+  if v, err := v.api.GetParam(param); err == nil  {
+    log.Println(v)
+  }
+}
+
+func (v *Vehicle) Up(rate float32) {
+  v.getRCMappings("THROTTLE")
 }
