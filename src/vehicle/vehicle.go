@@ -189,7 +189,7 @@ func (v *Vehicle) stateHandler() {
                   notFound = append(notFound, i)
                 }
               }
-              log.Println("WARN Failed to fetch the following params: ", notFound)
+              log.Println("WARN Failed to fetch the following params: ", notFound, "Total:", total)
               v.api.ForceParamInit()
             }
 
