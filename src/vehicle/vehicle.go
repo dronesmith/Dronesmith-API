@@ -129,6 +129,7 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 
 func (v *Vehicle) sysOnlineHandler() {
   // Main system handler if the init was completed.
+  log.Println("Sys online handler")
   v.Up(0.8)
 
   // Check command Queue
@@ -177,12 +178,18 @@ func (v *Vehicle) stateHandler() {
           v.GetParams()
           v.ParamsTimer = time.Now()
         } else {
-          if total, foundSet := v.api.CheckParams(); len(foundSet) == int(total) || v.api.ParamForced() {
+          if total, foundSet := v.api.CheckParams(); len(foundSet)-1 == int(total) || v.api.ParamForced() {
             // We're fully initialized!
             v.sysOnlineHandler()
           } else {
-            if time.Now().Sub(v.ParamsTimer) > 20 * time.Second {
-              log.Println("WARN Only got the following params: ", foundSet)
+            if time.Now().Sub(v.ParamsTimer) > 10 * time.Second {
+              var notFound []int
+              for i := 0; i < int(total); i++ {
+                if !foundSet[uint(i)] {
+                  notFound = append(notFound, i)
+                }
+              }
+              log.Println("WARN Failed to fetch the following params: ", notFound)
               v.api.ForceParamInit()
             }
 

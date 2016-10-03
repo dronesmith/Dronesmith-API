@@ -10,7 +10,7 @@ import (
   "flag"
   "log"
   "vehicle"
-
+  "rest"
 )
 
 
@@ -24,4 +24,7 @@ func main() {
   vehicle := vehicle.NewVehicle(*ipAddr, *remoteAddr)
   defer vehicle.Close()
   vehicle.Listen()
+
+  apiServer := rest.NewRestServer(8080)
+  apiServer.Listen()
 }

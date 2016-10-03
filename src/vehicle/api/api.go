@@ -840,7 +840,7 @@ func (v *VehicleApi) UpdateFromParam(m *mavlink.ParamValue) {
     }
   }
 
-  log.Println(m.ParamIndex, str)
+  // log.Println(m.ParamIndex, str)
 
   v.params[str] = &Param{
     uint(m.ParamIndex),
