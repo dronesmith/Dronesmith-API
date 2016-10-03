@@ -5,10 +5,22 @@ import (
   "os"
   "strconv"
   "net"
+  "time"
+  "math/rand"
+  "dronemanager/dronedp"
 )
 
 type DroneManager struct {
   port uint
+  sessions map[string]Session
+}
+
+type Session struct {
+  id    uint32
+}
+
+func (s *Session) genRandomId() {
+  s.id = uint32(rand.Int())
 }
 
 func CheckError(err error) {
@@ -19,8 +31,10 @@ func CheckError(err error) {
 }
 
 func NewDroneManager(port uint) *DroneManager {
+  rand.Seed(time.Now().UTC().UnixNano())
   return &DroneManager{
     port,
+    make(map[string]Session),
   }
 }
 
@@ -41,10 +55,19 @@ func (m *DroneManager) Listen() {
 
   for {
     n,addr,err := ServerConn.ReadFromUDP(buf)
-    log.Println("Received ",string(buf[0:n]), " from ",addr)
-
     if err != nil {
       log.Println("Error: ",err)
     }
+
+    if decoded, err := dronedp.ParseMsg(buf[0:n]); err != nil {
+      log.Println(err)
+    } else {
+      log.Println(addr)
+      m.handleMessage(decoded)
+    }
   }
+}
+
+func (m *DroneManager) handleMessage(decoded *dronedp.Msg) {
+  log.Println(decoded)
 }
