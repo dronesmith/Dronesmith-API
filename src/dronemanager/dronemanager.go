@@ -39,11 +39,20 @@ type DroneManager struct {
 }
 
 type SessConn struct {
+  Id   uint32
   conn *net.UDPConn
   addr *net.UDPAddr
 }
+
+//
+// Used by the encoder in Vehicle to send messages.
+//
 func (sw *SessConn) Write(p []byte) (n int, err error) {
-  return 0, nil
+  if msg, err := dronedp.GenerateMsg(dronedp.OP_MAVLINK_BIN, sw.Id, p); err != nil {
+    return 0, err
+  } else {
+    return sw.conn.WriteToUDP(msg, sw.addr)
+  }
 }
 
 type Session struct {
@@ -170,10 +179,12 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
       Drone: resp.Drone,
       User: userId,
       lastUpdate: time.Now(),
-      link: SessConn{m.conn, addr,},
+      link: SessConn{0, m.conn, addr,},
     }
 
     sessObj.genId()
+
+    sessObj.link.Id = sessObj.id
 
     m.sessionLock.Lock()
     defer m.sessionLock.Unlock()
