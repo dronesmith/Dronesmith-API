@@ -11,6 +11,7 @@ import (
   "utils/keen"
   "sync"
   "dronemanager/dronedp"
+  "vehicle"
 )
 
 const (
@@ -37,12 +38,22 @@ type DroneManager struct {
   conn *net.UDPConn
 }
 
+type SessConn struct {
+  conn *net.UDPConn
+  addr *net.UDPAddr
+}
+func (sw *SessConn) Write(p []byte) (n int, err error) {
+  return 0, nil
+}
+
 type Session struct {
   id      uint32
   State   string
   Drone   map[string]interface{}
   User    string
+  link    SessConn
   lastUpdate time.Time
+  veh *vehicle.Vehicle
 }
 
 func (s *Session) genRandomId() {
@@ -134,6 +145,9 @@ func (m *DroneManager) handleMessage(decoded *dronedp.Msg, addr *net.UDPAddr) {
   case dronedp.OP_STATUS:
     statusMsg := decoded.Data.(*dronedp.StatusMsg)
     m.handleStatusMessage(statusMsg, addr, decoded.Session)
+  case dronedp.OP_MAVLINK_BIN:
+    mavChunk := decoded.Data.([]byte)
+    m.handleMavlink(mavChunk, decoded.Session)
   }
 }
 
@@ -156,6 +170,7 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
       Drone: resp.Drone,
       User: userId,
       lastUpdate: time.Now(),
+      link: SessConn{m.conn, addr,},
     }
 
     sessObj.genId()
@@ -178,6 +193,14 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
         log.Println("Network error:", err)
       } else {
         log.Println("Session Changed:", sessObj.id)
+
+        // Create a new Vehicle if it does not already exist.
+        if sessObj.veh == nil {
+          // Id for API is the same as the mongo Id.
+          // TODO add name as well.
+          dId := sessObj.Drone["_id"].(string)
+          sessObj.veh = vehicle.NewVehicle(dId, &sessObj.link)
+        }
       }
     }
   }
@@ -199,9 +222,18 @@ func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPA
         log.Println("Network error:", err)
       }
     }
+  }
+}
 
-    // Get payload data if any (TODO)
+func (m *DroneManager) handleMavlink(chunk []byte, id uint32) {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+  if _, found := m.sessions[id]; found {
+    // make sure this is ref so we update the timestamp.
+    sessObj := m.sessions[id]
+    sessObj.lastUpdate = time.Now()
 
-    // Make command buffer null (TODO)
+    // Time to get swchifty
+    sessObj.veh.ProcessPacket(chunk)
   }
 }

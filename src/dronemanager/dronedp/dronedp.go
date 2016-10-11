@@ -5,6 +5,7 @@ import (
   "encoding/binary"
   "encoding/json"
   "errors"
+  // "log"
 
   "dronemanager/crc16"
   "mavlink/parser"
@@ -172,7 +173,7 @@ func ParseMsg(data []byte) (*Msg, error) {
 
   switch (msg.Op) {
   case OP_MAVLINK_BIN:
-    return nil, errors.New("D2P.Parse: OP_MAVLINK_BIN is unsupported.")
+    msg.Data = decoded
 
   case OP_MAVLINK_TEXT:
     msg.Data = &mavlink.Packet{}

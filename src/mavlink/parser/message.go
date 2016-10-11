@@ -148,7 +148,9 @@ func (dec *Decoder) Decode() (*Packet, error) {
 
 // Decode a packet from a previously received buffer (such as a UDP packet),
 // b must contain a complete message
-func (dec *Decoder) DecodeBytes(b []byte) (*Packet, error) {
+func DecodeBytes(b []byte) (*Packet, error) {
+
+	Dialects := DialectSlice{DialectCommon}
 
 	if len(b) < hdrLen || b[0] != startByte {
 		return nil, errors.New("invalid header")
@@ -160,7 +162,7 @@ func (dec *Decoder) DecodeBytes(b []byte) (*Packet, error) {
 	p.Payload = b[hdrLen: hdrLen+payloadLen]
 	crc.Write(b[1:hdrLen+payloadLen])
 
-	crcx, err := dec.Dialects.findCrcX(p.MsgID)
+	crcx, err := Dialects.findCrcX(p.MsgID)
 	if err != nil {
 		return p, err
 	}
@@ -173,7 +175,7 @@ func (dec *Decoder) DecodeBytes(b []byte) (*Packet, error) {
 		return p, ErrCrcFail
 	}
 
-	dec.CurrSeqID = p.SeqID
+	// dec.CurrSeqID = p.SeqID
 	return p, nil
 }
 

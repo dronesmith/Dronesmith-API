@@ -9,21 +9,21 @@ package main
 import (
   "flag"
   "log"
-  "vehicle"
+  // "vehicle"
   "dronemanager"
   // "rest"
 )
 
 
 func main() {
-  ipAddr := flag.String("master", "0.0.0.0:14550", "Network address of incoming MAVLink. (UDP)")
-  remoteAddr := flag.String("remote", "", "Network address to send outbound MAVLink to. (UDP)")
+  // ipAddr := flag.String("master", "0.0.0.0:14550", "Network address of incoming MAVLink. (UDP)")
+  // remoteAddr := flag.String("remote", "", "Network address to send outbound MAVLink to. (UDP)")
 
   flag.Parse()
   log.SetPrefix("[API] ")
 
-  vehicle := vehicle.NewVehicle(*ipAddr, *remoteAddr)
-  defer vehicle.Close()
+  // vehicle := vehicle.NewVehicle(*ipAddr, *remoteAddr)
+  // defer vehicle.Close()
   // vehicle.Listen()
 
   // apiServer := rest.NewRestServer(8080)

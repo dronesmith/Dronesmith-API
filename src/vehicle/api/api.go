@@ -200,6 +200,7 @@ type VehicleApi struct {
 }
 
 func NewVehicleApi(id string) *VehicleApi {
+  log.Println("Vehicle <" + id + "> Init")
   api := &VehicleApi{}
   api.id = id
   api.sysId = 0

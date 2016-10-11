@@ -4,6 +4,7 @@ import (
   "net"
   "log"
   "os"
+  "io"
   "time"
   "utils"
 
@@ -40,11 +41,11 @@ func mavParseError(err error) {
   }
 }
 
-func NewVehicle(address, remote string) *Vehicle {
-  var err error
+func NewVehicle(id string, writer io.Writer) *Vehicle {
+  // var err error
   vehicle := &Vehicle{}
 
-  vehicle.api = api.NewVehicleApi("1")
+  vehicle.api = api.NewVehicleApi(id)
   vehicle.knownMsgs = make(map[string]mavlink.Message)
   vehicle.unknownMsgs = make(map[uint8]*mavlink.Packet)
 
@@ -62,24 +63,31 @@ func NewVehicle(address, remote string) *Vehicle {
   vehicle.commandQueue = utils.NewPQueue(utils.MINPQ)
   vehicle.syslogQueue = utils.NewCappedDeque(200)
 
-  vehicle.address, err = net.ResolveUDPAddr("udp", address)
-  checkError(err)
+  // vehicle.address, err = net.ResolveUDPAddr("udp", address)
+  // checkError(err)
+  //
+  // vehicle.connection, err = net.ListenUDP("udp", vehicle.address)
+  // checkError(err)
 
-  vehicle.connection, err = net.ListenUDP("udp", vehicle.address)
-  checkError(err)
+  // vehicle.mavlinkReader = mavlink.NewDecoder(io.Reader)
+  vehicle.mavlinkWriter = mavlink.NewEncoder(writer)
 
-  vehicle.mavlinkReader = mavlink.NewDecoder(vehicle.connection)
+  // if remote == "" {
+  //   vehicle.mavlinkWriter = mavlink.NewEncoder(vehicle.connection)
+  // } else {
+  //   var remoteConn net.Conn
+  //
+  //   remoteConn, err = net.Dial("udp", remote)
+  //   checkError(err)
+  //
+  //   vehicle.mavlinkWriter = mavlink.NewEncoder(remoteConn)
+  // }
 
-  if remote == "" {
-    vehicle.mavlinkWriter = mavlink.NewEncoder(vehicle.connection)
-  } else {
-    var remoteConn net.Conn
+  // Check systems are online
+  go vehicle.checkOnline()
 
-    remoteConn, err = net.Dial("udp", remote)
-    checkError(err)
-
-    vehicle.mavlinkWriter = mavlink.NewEncoder(remoteConn)
-  }
+  // Write logic
+  go vehicle.stateHandler()
 
   return vehicle
 }
@@ -94,6 +102,17 @@ func (v *Vehicle) GetParam(name string) {
 
 func (v *Vehicle) SetParam(name string) {
 
+}
+
+func (v *Vehicle) ProcessPacket(pack []byte) {
+  packet, err := mavlink.DecodeBytes(pack)
+  if err != nil {
+    log.Println("Parser:", err)
+  } else {
+    v.processPacket(packet)
+  }
+
+  time.Sleep(1 * time.Millisecond)
 }
 
 func (v *Vehicle) Listen() {
