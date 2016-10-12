@@ -663,9 +663,10 @@ func (v *VehicleApi) CheckCapability(cap uint64) bool {
 
 func (v *VehicleApi) PrintCapabilities() {
   log.Println("\t\t\t\t\t[WELCOME TO DSC]")
-  log.Println("FMU Type:", v.info.Type)
+  log.Println("Comms Protocol:", v.info.Protocol)
+  log.Println("Vehicle Configuration:", v.info.Type)
   log.Println("Firmware:", v.info.Firmware)
-  log.Println("Flight Control Version:", v.fmuGit)
+  log.Println("Version:", v.fmuGit)
 
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_MISSION_FLOAT) {
