@@ -5,7 +5,7 @@ import (
   "os"
   "strconv"
   "net"
-  "rest"
+  "cloud"
   "time"
   "math/rand"
   "utils/keen"
@@ -172,7 +172,7 @@ func (m *DroneManager) handleStatusMessage(msg *dronedp.StatusMsg, addr *net.UDP
 }
 
 func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDPAddr) {
-  if resp, err := rest.RequestDroneInfo(msg.Serial, msg.Email, msg.Password); err != nil {
+  if resp, err := cloud.RequestDroneInfo(msg.Serial, msg.Email, msg.Password); err != nil {
     log.Println("Auth failed:", err)
   } else {
 

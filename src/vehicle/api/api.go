@@ -635,12 +635,6 @@ func (v *VehicleApi) UpdateFromAutopilotVersion(m *mavlink.AutopilotVersion) {
   v.caps = m.Capabilities
   v.fmuId = m.Uid
 
-  // byteArray := make([]byte, 8)
-  // for i, e := range m.FlightCustomVersion {
-  //   byteArray[i] = byte(e)
-  // }
-  // v.fmuGit = hex.EncodeToString(byteArray)
-
   // decode version tag
   {
     major := m.FlightSwVersion & 0xFF000000 >> 24
@@ -667,7 +661,6 @@ func (v *VehicleApi) PrintCapabilities() {
   log.Println("Vehicle Configuration:", v.info.Type)
   log.Println("Firmware:", v.info.Firmware)
   log.Println("Version:", v.fmuGit)
-
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_MISSION_FLOAT) {
     log.Println("\tCOMMAND LONG SUPPORTED")

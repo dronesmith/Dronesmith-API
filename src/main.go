@@ -10,8 +10,8 @@ import (
   "flag"
   "log"
   // "vehicle"
-  "dronemanager"
-  // "rest"
+  // "dronemanager"
+  "rest"
 )
 
 
@@ -22,13 +22,12 @@ func main() {
   flag.Parse()
   log.SetPrefix("[API] ")
 
+  log.Println("API Service Init...")
+
   // vehicle := vehicle.NewVehicle(*ipAddr, *remoteAddr)
   // defer vehicle.Close()
   // vehicle.Listen()
 
-  // apiServer := rest.NewRestServer(8080)
-  // apiServer.Listen()
-
-  manager := dronemanager.NewDroneManager(4002)
-  manager.Listen()
+  apiServer := rest.NewRestServer(8080)
+  apiServer.Listen()
 }

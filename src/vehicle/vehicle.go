@@ -148,7 +148,7 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 
 func (v *Vehicle) sysOnlineHandler() {
   // Main system handler if the init was completed.
-  log.Println("Sys online handler")
+  // log.Println("Sys online handler")
   // v.Up(0.8)
 
   // Check command Queue
