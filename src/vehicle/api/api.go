@@ -6,7 +6,7 @@ import (
   "sync"
   "log"
   "fmt"
-  "encoding/hex"
+  // "encoding/hex"
   "strconv"
   "math"
 
@@ -301,7 +301,7 @@ func (v *VehicleApi) CheckSysOnline() {
 
   if v.status.Online && (time.Now().Sub(v.info.LastUpdate) > 5 * time.Second) {
     v.status.Online = false
-    log.Println("Vehicle offline")
+    log.Println("FMU Offline")
   }
 }
 
@@ -312,7 +312,7 @@ func (v *VehicleApi) UpdateFromHeartbeat(m *mavlink.Heartbeat) {
   if !v.status.Online {
     v.info.LastOnline = time.Now()
     v.status.Online = true
-    log.Println("Vehicle online")
+    log.Println("FMU Online")
   }
 
   v.info.LastUpdate = time.Now()
@@ -634,14 +634,27 @@ func (v *VehicleApi) UpdateFromAutopilotVersion(m *mavlink.AutopilotVersion) {
 
   v.caps = m.Capabilities
   v.fmuId = m.Uid
-  v.gotCaps = true
 
-  byteArray := make([]byte, 8)
-  for i, e := range m.FlightCustomVersion {
-    byteArray[i] = byte(e)
+  // byteArray := make([]byte, 8)
+  // for i, e := range m.FlightCustomVersion {
+  //   byteArray[i] = byte(e)
+  // }
+  // v.fmuGit = hex.EncodeToString(byteArray)
+
+  // decode version tag
+  {
+    major := m.FlightSwVersion & 0xFF000000 >> 24
+    minor := m.FlightSwVersion & 0x00FF0000 >> 16
+    patch := m.FlightSwVersion & 0x0000FF00 >> 8
+    git := m.FlightSwVersion & 0x000000FF
+    v.fmuGit = strconv.Itoa(int(major)) + "." + strconv.Itoa(int(minor)) + "." + strconv.Itoa(int(patch)) + "-" + strconv.Itoa(int(git))
   }
-  v.fmuGit = hex.EncodeToString(byteArray)
-  v.PrintCapabilities()
+
+  if !v.gotCaps {
+    v.PrintCapabilities()
+  }
+
+  v.gotCaps = true
 }
 
 func (v *VehicleApi) CheckCapability(cap uint64) bool {
@@ -649,7 +662,12 @@ func (v *VehicleApi) CheckCapability(cap uint64) bool {
 }
 
 func (v *VehicleApi) PrintCapabilities() {
-  log.Println("Vehicle Capabilities")
+  log.Println("\t\t\t\t\t[WELCOME TO DSC]")
+  log.Println("FMU Type:", v.info.Type)
+  log.Println("Firmware:", v.info.Firmware)
+  log.Println("Flight Control Version:", v.fmuGit)
+
+
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_MISSION_FLOAT) {
     log.Println("\tCOMMAND LONG SUPPORTED")
   }

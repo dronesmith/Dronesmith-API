@@ -101,7 +101,9 @@ func (m *DroneManager) checkTimers() {
     m.sessionLock.Lock()
     for id, sess := range m.sessions {
       if time.Now().Sub(sess.lastUpdate) > (5 * time.Second) {
-        log.Println(id, "Session timeout")
+        dId := sess.Drone["_id"].(string)
+        log.Println("Session", id, "timeout.")
+        log.Println("Vehicle <" + dId + "> Offline.")
 
         delete(m.sessions, id)
         m.keenBatch.AddEvent("dronelink", &DLTracker{
@@ -131,6 +133,8 @@ func (m *DroneManager) Listen() {
   buf := make([]byte, 1024)
 
   go m.checkTimers()
+
+  log.Println("Listening for vehicles on", m.port)
 
   for {
     n,addr,err := m.conn.ReadFromUDP(buf)
@@ -203,12 +207,13 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
       if _, err = m.conn.WriteToUDP(msg, addr); err != nil {
         log.Println("Network error:", err)
       } else {
-        log.Println("Session Changed:", sessObj.id)
+        log.Println("New session:", sessObj.id)
 
         // Create a new Vehicle if it does not already exist.
         if sessObj.veh == nil {
           // Id for API is the same as the mongo Id.
           // TODO add name as well.
+          log.Println("Vehicle Authenticated!")
           dId := sessObj.Drone["_id"].(string)
           sessObj.veh = vehicle.NewVehicle(dId, &sessObj.link)
         }

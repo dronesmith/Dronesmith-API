@@ -149,7 +149,7 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 func (v *Vehicle) sysOnlineHandler() {
   // Main system handler if the init was completed.
   log.Println("Sys online handler")
-  v.Up(0.8)
+  // v.Up(0.8)
 
   // Check command Queue
   if v.commandQueue.Size() > 0 {
@@ -190,10 +190,10 @@ func (v *Vehicle) stateHandler() {
       if !caps {
         // Get caps
         v.sendMAVLink(v.api.RequestVehicleInfo())
-        log.Println("Fetching caps...")
+        log.Println("Loading vehicle info...")
       } else {
         if !v.api.ParamsInit() {
-          log.Println("Fetching params...")
+          log.Println("Loading params...")
           v.GetParams()
           v.ParamsTimer = time.Now()
         } else {
@@ -213,13 +213,18 @@ func (v *Vehicle) stateHandler() {
             }
 
             // Don't have all of them, invidually request the params we don't have.
+            foundCnt := 0
             for i := 0; i < int(total); i++ {
               if _, f := foundSet[uint(i)]; !f {
                 v.sendMAVLink(v.api.RequestParam(uint(i)))
+              } else {
+                foundCnt += 1
               }
+
               // wait a teensy bit to give the firmware time to receive
               time.Sleep(5 * time.Millisecond)
             }
+            log.Println(int((float32(foundCnt) / float32(int(total))) * 100), "Percent of params loaded...")
           }
         }
       }
