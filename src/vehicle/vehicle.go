@@ -551,3 +551,7 @@ func (v *Vehicle) getRCMappings(kind string) {
 func (v *Vehicle) Up(rate float32) {
   v.getRCMappings("THROTTLE")
 }
+
+func (v *Vehicle) Telem() map[string]interface{} {
+  return v.api.GetVehicleTelem()
+}

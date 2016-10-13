@@ -83,7 +83,8 @@ type Position struct {
 //
 type Input struct {
   Channels  [18]uint16
-  Signal     uint
+  Signal    uint
+  Type      string
 }
 
 //
@@ -197,6 +198,27 @@ type VehicleApi struct {
   paramForceInit bool
 
   lock      sync.RWMutex
+}
+
+func (v *VehicleApi) GetVehicleTelem() map[string]interface{} {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+
+  telem := make(map[string]interface{})
+  // Note that this is a deep copy, to avoid race conditions.
+  telem["Info"] = v.info
+  telem["Status"] = v.status
+  telem["Mode"] = v.mode
+  telem["Gps"] = v.gps
+  telem["Attitude"] = v.attitude
+  telem["Position"] = v.position
+  telem["Motors"] = v.motors
+  telem["Input"] = v.input
+  telem["Rates"] = v.rates
+  telem["Target"] = v.target
+  telem["Sensors"] = v.sensors
+  telem["Home"] = v.home
+  return telem
 }
 
 func NewVehicleApi(id string) *VehicleApi {
@@ -489,6 +511,7 @@ func (v *VehicleApi) UpdateFromInput(m *mavlink.RcChannels) {
   v.input.Channels[16] = m.Chan17Raw
   v.input.Channels[17] = m.Chan18Raw
   v.input.Signal = uint(m.Rssi)
+  v.input.Type = "Radio Control"
 }
 
 func (v *VehicleApi) UpdateFromVfr(m *mavlink.VfrHud) {

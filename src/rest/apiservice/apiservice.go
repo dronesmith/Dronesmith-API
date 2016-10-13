@@ -2,7 +2,7 @@ package apiservice
 
 import (
   "log"
-  // "fmt"
+  "fmt"
   "net/http"
   "regexp"
   "encoding/json"
@@ -49,7 +49,7 @@ func (api *DroneAPI) SendAPIError(err error, w *http.ResponseWriter) {
   json.NewEncoder(*w).Encode(t)
 }
 
-func (api *DroneAPI) SendAPIJSON(data map[string]interface{}, w *http.ResponseWriter) {
+func (api *DroneAPI) SendAPIJSON(data interface{}, w *http.ResponseWriter) {
   (*w).Header().Set("Content-Type", "application/json")
   (*w).WriteHeader(200)
   json.NewEncoder(*w).Encode(data)
@@ -114,15 +114,43 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     droneData["online"] = true
   }
 
-  // No requests, send vehicle information including online status.
-  if len(filteredPath) < 3 {
-    api.SendAPIJSON(droneData, &w)
-    return
+  // handle GETs
+  if req.Method == "GET" {
+
+    // No requests, send vehicle information including online status.
+    if len(filteredPath) < 3 {
+      api.SendAPIJSON(droneData, &w)
+      return
+    }
+
+    chunk := veh.Telem()
+
+    switch filteredPath[2] {
+    case "info": api.handleTelem("Info", chunk, &w)
+    case "status": api.handleTelem("Status", chunk, &w)
+    case "gps": api.handleTelem("Gps", chunk, &w)
+    case "mode": api.handleTelem("Mode", chunk, &w)
+    case "attitude": api.handleTelem("Attitude", chunk, &w)
+    case "position": api.handleTelem("Position", chunk, &w)
+    case "motors": api.handleTelem("Motors", chunk, &w)
+    case "input": api.handleTelem("Input", chunk, &w)
+    case "rates": api.handleTelem("Rates", chunk, &w)
+    case "target": api.handleTelem("Target", chunk, &w)
+    case "sensors": api.handleTelem("Sensors", chunk, &w)
+    case "home": api.handleTelem("Home", chunk, &w)
+    default: api.Send404(&w)
+    }
+  } else {
+    api.Send404(&w)
   }
+}
 
-  switch filteredPath[2] {
+func (api *DroneAPI) handleTelem(kind string, data map[string]interface{}, w *http.ResponseWriter) {
+  val, found := data[kind]
 
+  if found {
+    api.SendAPIJSON(val, w)
+  } else {
+    api.SendAPIError(fmt.Errorf("Could not retrieve " + kind + " object."), w)
   }
-
-
 }
