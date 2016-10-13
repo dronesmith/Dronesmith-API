@@ -253,3 +253,18 @@ func (m *DroneManager) handleMavlink(chunk []byte, id uint32) {
     sessObj.veh.ProcessPacket(chunk)
   }
 }
+
+// Find a vehicle. Just a sequential search for now, in the future we
+// might need to refactor this.
+func (m *DroneManager) FindVehicle(id string) *vehicle.Vehicle {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+  for _ , session := range m.sessions {
+    dId := session.Drone["_id"].(string)
+    if dId == id {
+      return session.veh
+    }
+  }
+
+  return nil
+}
