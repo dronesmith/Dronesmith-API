@@ -7,6 +7,7 @@ import (
   "io"
   "time"
   "utils"
+  "sync"
 
   "mavlink/parser"
   "vehicle/api"
@@ -24,6 +25,9 @@ type Vehicle struct {
 
   commandQueue  *utils.PQueue
   syslogQueue   *utils.Deque
+
+  commandLast   int
+  commandSync   sync.RWMutex
 
   ParamsTimer   time.Time
 }
@@ -158,6 +162,9 @@ func (v *Vehicle) sysOnlineHandler() {
     if cmd.Status == mavlink.MAV_RESULT_ACCEPTED {
       // got a valid ack, dequeue and send next item
       v.commandQueue.Pop()
+      v.commandSync.Lock()
+      v.commandLast = int(cmd.Command.Command)
+      v.commandSync.Unlock()
     } else if cmd.Status == mavlink.MAV_RESULT_DENIED ||
       cmd.Status == mavlink.MAV_RESULT_UNSUPPORTED ||
       cmd.Status == mavlink.MAV_RESULT_FAILED {
@@ -514,6 +521,18 @@ func (v *Vehicle) GetSysLog() []*api.VehicleLog {
     log = append(log, val.(*api.VehicleLog))
   }
   return log
+}
+
+func (v *Vehicle) GetLastSuccessfulCmd() int {
+  v.commandSync.RLock()
+  defer v.commandSync.RUnlock()
+  return v.commandLast
+}
+
+func (v *Vehicle) NullLastSuccessfulCmd() {
+  v.commandSync.Lock()
+  defer v.commandSync.Unlock()
+  v.commandLast = 0
 }
 
 //

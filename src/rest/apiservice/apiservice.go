@@ -6,10 +6,11 @@ import (
   "net/http"
   "regexp"
   "encoding/json"
+  "time"
 
   "cloud"
   "dronemanager"
-  // "vehicle"
+  "vehicle"
 )
 
 type DroneAPI struct {
@@ -138,10 +139,76 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     case "target": api.handleTelem("Target", chunk, &w)
     case "sensors": api.handleTelem("Sensors", chunk, &w)
     case "home": api.handleTelem("Home", chunk, &w)
+    case "log": api.handleLog(veh, &w)
     default: api.Send404(&w)
     }
+  } else if req.Method == "POST" {
+    decoder := json.NewDecoder(req.Body)
+    var pdata map[string]interface{}
+    err := decoder.Decode(&pdata)
+    if err != nil {
+      api.Send404(&w)
+      return
+    }
+    defer req.Body.Close()
+
+    switch filteredPath[2] {
+    case "mode": api.handleModeArm(veh, pdata, &w)
+    case "command":
+    case "param":
+    default: api.Send404(&w)
+    }
+  }
+}
+
+func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
+  doSetArm := false
+  doSetMode := false
+  arming := false
+  mode := ""
+
+  if a, f := postData["arm"]; f {
+    doSetArm = true
+    arming = a.(bool)
+  }
+
+  if m, f := postData["mode"]; f {
+    doSetMode = true
+    mode = m.(string)
+  }
+
+  veh.SetModeAndArm(doSetMode, doSetArm, mode, arming)
+  attempts := 0
+  data := make(map[string]interface{})
+  for {
+    if attempts >= 10 {
+      break
+    }
+    time.Sleep(5 * time.Millisecond)
+
+    if veh.GetLastSuccessfulCmd() == 176 {
+      data["Status"] = "OK"
+      data["Command"] = "Set Vehicle Mode and ARM"
+      veh.NullLastSuccessfulCmd()
+      api.SendAPIJSON(data, w)
+      return
+    }
+
+    attempts++
+  }
+
+  data["Status"] = "FAIL"
+  data["Command"] = "Set Vehicle Mode and ARM"
+  api.SendAPIJSON(data, w)
+}
+
+func (api *DroneAPI) handleLog(veh *vehicle.Vehicle, w *http.ResponseWriter) {
+  data := veh.GetSysLog()
+
+  if data == nil {
+    api.SendAPIJSON(make([]string, 1), w)
   } else {
-    api.Send404(&w)
+    api.SendAPIJSON(data, w)
   }
 }
 
