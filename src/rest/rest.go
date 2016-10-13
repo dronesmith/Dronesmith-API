@@ -20,7 +20,7 @@ var (
 type RestServer struct {
   port int
   apiMux *http.ServeMux
-  api *apiservice.APIService
+  droneApi *apiservice.DroneAPI
 }
 
 func NewRestServer(addr int) *RestServer {
@@ -31,10 +31,10 @@ func NewRestServer(addr int) *RestServer {
 
 func (r *RestServer) Listen() {
   r.apiMux = http.NewServeMux()
-  r.api = apiservice.NewAPIService(4002)
+  r.droneApi = apiservice.NewDroneAPI(4002)
 
-  r.apiMux.Handle("/api/", r.api)
-  r.apiMux.HandleFunc("/",  r.rootHandler)
+  r.apiMux.Handle(      "/drone/", r.droneApi)
+  r.apiMux.HandleFunc(  "/",       r.rootHandler)
 
   log.Println("API listening on", r.port)
   log.Fatal(http.ListenAndServe(":" + strconv.Itoa(r.port), r.apiMux))
