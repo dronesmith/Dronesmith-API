@@ -156,6 +156,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     case "mode": api.handleModeArm(veh, pdata, &w)
     case "command":
     case "param":
+    case "home": api.handleSetHome(veh, pdata, &w)
     default: api.Send404(&w)
     }
   }
@@ -184,7 +185,7 @@ func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]int
     if attempts >= 10 {
       break
     }
-    time.Sleep(5 * time.Millisecond)
+    time.Sleep(15 * time.Millisecond)
 
     if veh.GetLastSuccessfulCmd() == 176 {
       data["Status"] = "OK"
@@ -201,6 +202,61 @@ func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]int
   data["Command"] = "Set Vehicle Mode and ARM"
   api.SendAPIJSON(data, w)
 }
+
+func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
+
+  var lat, lon, alt float64
+  var rel bool
+  if postData["lat"] != nil {
+    lat = postData["lat"].(float64)
+  } else {
+    lat = 0.0
+  }
+
+  if postData["lon"] != nil {
+    lon = postData["lon"].(float64)
+  } else {
+    lat = 0.0
+  }
+
+  if postData["alt"] != nil {
+    alt = postData["alt"].(float64)
+  } else {
+    alt = 0.0
+  }
+
+  if postData["relative"] != nil {
+    rel = postData["relative"].(bool)
+  } else {
+    rel = false
+  }
+
+  veh.SetHome(float32(lat), float32(lon), float32(alt), rel)
+
+  attempts := 0
+  data := make(map[string]interface{})
+  for {
+    if attempts >= 10 {
+      break
+    }
+    time.Sleep(15 * time.Millisecond)
+
+    if veh.GetLastSuccessfulCmd() == 179 {
+      data["Status"] = "OK"
+      data["Command"] = "Set Vehicle Mode and ARM"
+      veh.NullLastSuccessfulCmd()
+      api.SendAPIJSON(data, w)
+      return
+    }
+
+    attempts++
+  }
+
+  data["Status"] = "FAIL"
+  data["Command"] = "Set Vehicle Mode and ARM"
+  api.SendAPIJSON(data, w)
+}
+
 
 func (api *DroneAPI) handleLog(veh *vehicle.Vehicle, w *http.ResponseWriter) {
   data := veh.GetSysLog()

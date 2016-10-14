@@ -514,6 +514,25 @@ func (v *Vehicle) SetModeAndArm(updateMode, updateArm bool, mode string, armed b
   v.commandQueue.Push(cmd, mavlink.MAV_CMD_DO_SET_MODE)
 }
 
+func (v *Vehicle) SetHome(lat, lon, alt float32, relative bool) {
+  var relParam float32
+
+  if relative {
+    relParam = 1.0
+  } else {
+    relParam = 0.0
+  }
+
+  cmd := &api.VehicleCommand{
+    Status: 10, // Must be greater than 4 due to MAV_RESULT
+    TimesSent: 0,
+    Command: v.api.PackComandLong(mavlink.MAV_CMD_DO_SET_HOME,
+      [7]float32{relParam, 0.0, 0.0, 0.0, lat, lon, alt}),
+  }
+
+  v.commandQueue.Push(cmd, mavlink.MAV_CMD_DO_SET_HOME)
+}
+
 func (v *Vehicle) GetSysLog() []*api.VehicleLog {
   var log []*api.VehicleLog
   for !v.syslogQueue.Empty() {
@@ -533,6 +552,10 @@ func (v *Vehicle) NullLastSuccessfulCmd() {
   v.commandSync.Lock()
   defer v.commandSync.Unlock()
   v.commandLast = 0
+}
+
+func (v *Vehicle) Telem() map[string]interface{} {
+  return v.api.GetVehicleTelem()
 }
 
 //
@@ -569,8 +592,4 @@ func (v *Vehicle) getRCMappings(kind string) {
 
 func (v *Vehicle) Up(rate float32) {
   v.getRCMappings("THROTTLE")
-}
-
-func (v *Vehicle) Telem() map[string]interface{} {
-  return v.api.GetVehicleTelem()
 }
