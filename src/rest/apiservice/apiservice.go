@@ -159,6 +159,9 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     case "home": api.handleSetHome(veh, pdata, &w)
     default: api.Send404(&w)
     }
+  } else {
+    // forward
+    http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 301)
   }
 }
 

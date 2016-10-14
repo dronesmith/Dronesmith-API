@@ -10,11 +10,9 @@ import (
   "log"
   "net/http"
   "strconv"
+
+  "cloud"
   "rest/apiservice"
-)
-
-var (
-
 )
 
 type RestServer struct {
@@ -29,12 +27,19 @@ func NewRestServer(addr int) *RestServer {
   }
 }
 
+func (r *RestServer) handleForward(w http.ResponseWriter, req *http.Request) {
+  log.Println("REQUEST", req.Method, req.URL.Path)
+  http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 301)
+}
+
 func (r *RestServer) Listen() {
   r.apiMux = http.NewServeMux()
   r.droneApi = apiservice.NewDroneAPI(4002)
 
-  r.apiMux.Handle(      "/drone/", r.droneApi)
-  r.apiMux.HandleFunc(  "/",       r.rootHandler)
+  r.apiMux.Handle(      "/drone/",    r.droneApi)
+  r.apiMux.HandleFunc(  "/user/",     r.handleForward)
+  r.apiMux.HandleFunc(  "/mission/",  r.handleForward)
+  r.apiMux.HandleFunc(  "/",          r.rootHandler)
 
   log.Println("API listening on", r.port)
   log.Fatal(http.ListenAndServe(":" + strconv.Itoa(r.port), r.apiMux))
