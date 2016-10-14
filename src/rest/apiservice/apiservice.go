@@ -66,6 +66,15 @@ func (api *DroneAPI) Validate(email, key, id string) (found bool, droneInfo map[
 }
 
 func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+  // Handle panics
+  defer func() {
+    if r := recover(); r != nil {
+      w.WriteHeader(500)
+      log.Println("Request paniced!", r)
+      fmt.Fprintf(w, "I couldn't parse your request. Make sure you are formating your JSON properly, including types.\n")
+    }
+  }()
+
   log.Println("REQUEST", req.Method, req.URL.Path)
 
   paths := api.spltRgxp.Split(req.URL.Path, -1)
@@ -185,10 +194,10 @@ func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]int
   attempts := 0
   data := make(map[string]interface{})
   for {
-    if attempts >= 10 {
+    if attempts >= 3 {
       break
     }
-    time.Sleep(15 * time.Millisecond)
+    time.Sleep(250 * time.Millisecond)
 
     if veh.GetLastSuccessfulCmd() == 176 {
       data["Status"] = "OK"
@@ -239,14 +248,14 @@ func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]int
   attempts := 0
   data := make(map[string]interface{})
   for {
-    if attempts >= 10 {
+    if attempts >= 3 {
       break
     }
-    time.Sleep(15 * time.Millisecond)
+    time.Sleep(250 * time.Millisecond)
 
     if veh.GetLastSuccessfulCmd() == 179 {
       data["Status"] = "OK"
-      data["Command"] = "Set Vehicle Mode and ARM"
+      data["Command"] = "Set Vehicle Home Location"
       veh.NullLastSuccessfulCmd()
       api.SendAPIJSON(data, w)
       return
