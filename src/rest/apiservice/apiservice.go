@@ -3,10 +3,12 @@ package apiservice
 import (
   "log"
   "fmt"
+  "math"
   "net/http"
   "regexp"
   "encoding/json"
   "time"
+  "strconv"
 
   "cloud"
   "dronemanager"
@@ -53,7 +55,10 @@ func (api *DroneAPI) SendAPIError(err error, w *http.ResponseWriter) {
 func (api *DroneAPI) SendAPIJSON(data interface{}, w *http.ResponseWriter) {
   (*w).Header().Set("Content-Type", "application/json")
   (*w).WriteHeader(200)
-  json.NewEncoder(*w).Encode(data)
+  err := (json.NewEncoder(*w)).Encode(data)
+  if err != nil {
+    panic(err)
+  }
 }
 
 func (api *DroneAPI) Validate(email, key, id string) (found bool, droneInfo map[string]interface{}) {
@@ -149,6 +154,18 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     case "sensors": api.handleTelem("Sensors", chunk, &w)
     case "home": api.handleTelem("Home", chunk, &w)
     case "log": api.handleLog(veh, &w)
+    case "param":
+      if len(filteredPath) < 4 {
+        api.Send404(&w)
+      } else {
+        api.handleGetSingleParam(veh, filteredPath[3], &w)
+      }
+    case "params":
+      if len(filteredPath) < 4 {
+        api.handleGetAllParams(veh, &w)
+      } else if filteredPath[3] == "refresh" {
+        api.handleRefreshParams(veh, &w)
+      }
     default: api.Send404(&w)
     }
   } else if req.Method == "POST" {
@@ -165,6 +182,11 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     case "mode": api.handleModeArm(veh, pdata, &w)
     case "command":
     case "param":
+      if len(filteredPath) < 4 {
+        api.Send404(&w)
+      } else {
+        api.handleSetParam(veh, filteredPath[3], pdata, &w)
+      }
     case "home": api.handleSetHome(veh, pdata, &w)
     default: api.Send404(&w)
     }
@@ -287,5 +309,74 @@ func (api *DroneAPI) handleTelem(kind string, data map[string]interface{}, w *ht
     api.SendAPIJSON(val, w)
   } else {
     api.SendAPIError(fmt.Errorf("Could not retrieve " + kind + " object."), w)
+  }
+}
+
+func (api *DroneAPI) handleGetAllParams(veh *vehicle.Vehicle, w *http.ResponseWriter) {
+  paramsRes := make(map[string]interface{})
+  current, total, chunk := veh.GetAllParams()
+  paramsRes["total"] = total
+  paramsRes["current"] = current
+  paramsRes["missing"] = veh.MissingParams()
+
+  // JSON cannot encode NaNs
+  for k, e := range chunk {
+    if math.IsNaN(float64(e)) {
+      chunk[k] = 0.0
+    }
+  }
+
+  paramsRes["params"] = chunk
+  api.SendAPIJSON(paramsRes, w)
+}
+
+func (api *DroneAPI) handleRefreshParams(veh *vehicle.Vehicle, w *http.ResponseWriter) {
+  veh.RefreshParams()
+
+  attempts := 0
+  data := make(map[string]interface{})
+  for {
+    c, t, _ := veh.GetAllParams()
+    if c >= t {
+      data["Status"] = "OK"
+      data["total"] = t
+      api.SendAPIJSON(data, w)
+      return
+    }
+    time.Sleep(50 * time.Millisecond)
+    attempts++
+    if attempts > 20 {
+      break
+    }
+  }
+
+  api.SendAPIError(fmt.Errorf("Failed to fetch all params."), w)
+}
+
+func (api *DroneAPI) handleGetSingleParam(veh *vehicle.Vehicle, name string, w *http.ResponseWriter) {
+  var val float32
+  var perr error
+  if i, err := strconv.Atoi(name); err != nil {
+    // look up by string
+    val, perr = veh.GetParam(name)
+  } else {
+    val, perr = veh.GetParamByIndex(uint(i))
+  }
+
+  if perr != nil {
+    api.SendAPIError(perr, w)
+  } else {
+    api.SendAPIJSON(val, w)
+  }
+}
+
+func (api *DroneAPI) handleSetParam(veh *vehicle.Vehicle, path string, data map[string]interface{}, w *http.ResponseWriter) {
+  val := data["value"].(float64)
+  if err := veh.SetParam(path, float32(val)); err != nil {
+    api.SendAPIError(err, w)
+  } else {
+    ret := make(map[string]interface{})
+    ret["Status"] = "OK"
+    api.SendAPIJSON(ret, w)
   }
 }

@@ -5,6 +5,7 @@ import (
   "log"
   "os"
   "io"
+  "fmt"
   "time"
   "utils"
   "sync"
@@ -22,6 +23,8 @@ type Vehicle struct {
   api           *api.VehicleApi
   knownMsgs     map[string]mavlink.Message
   unknownMsgs   map[uint8]*mavlink.Packet
+  missingParams []int
+  paramsLock    sync.RWMutex
 
   commandQueue  *utils.PQueue
   syslogQueue   *utils.Deque
@@ -100,14 +103,6 @@ func (v *Vehicle) GetParams() {
   v.sendMAVLink(v.api.RequestParamsList())
 }
 
-func (v *Vehicle) GetParam(name string) {
-
-}
-
-func (v *Vehicle) SetParam(name string) {
-
-}
-
 func (v *Vehicle) ProcessPacket(pack []byte) {
   packet, err := mavlink.DecodeBytes(pack)
   if err != nil {
@@ -153,6 +148,7 @@ func (v *Vehicle) sendMAVLink(m mavlink.Message) {
 func (v *Vehicle) sysOnlineHandler() {
   // Main system handler if the init was completed.
   // log.Println("Sys online handler")
+  //  log.Println(v.api.GetParam("BAT_CAPACITY"))
 
   // Check command Queue
   if v.commandQueue.Size() > 0 {
@@ -215,6 +211,9 @@ func (v *Vehicle) stateHandler() {
                 }
               }
               log.Println("WARN Failed to fetch the following params: ", notFound, "Total:", total)
+              v.paramsLock.Lock()
+              v.missingParams = notFound
+              v.paramsLock.Unlock()
               v.api.ForceParamInit()
             }
 
@@ -555,6 +554,60 @@ func (v *Vehicle) NullLastSuccessfulCmd() {
 
 func (v *Vehicle) Telem() map[string]interface{} {
   return v.api.GetVehicleTelem()
+}
+
+func (v *Vehicle) GetParam(name string) (float32, error) {
+  return v.api.GetParam(name)
+}
+
+func (v *Vehicle) GetParamByIndex(id uint) (float32, error) {
+  attempts := 0
+  if val, err := v.api.GetParamIndex(id); err != nil {
+    return val, nil
+  }
+  for {
+    if val, err := v.api.GetParamIndex(id); err == nil {
+      return val, nil
+    } else {
+      v.sendMAVLink(v.api.RequestParam(id))
+    }
+    time.Sleep(30 * time.Millisecond)
+    attempts++
+    if attempts > 10 {
+      return 0.0, fmt.Errorf("Could not retrieve param.")
+    }
+  }
+}
+
+func (v *Vehicle) SetParam(name string, value float32) error {
+  v.sendMAVLink(v.api.SetParam(name, value))
+  time.Sleep(250 * time.Millisecond)
+  if val, err := v.api.GetParam(name); err != nil {
+    return err
+  } else if val != value {
+    return fmt.Errorf("Param found, but failed to update")
+  } else {
+    return nil
+  }
+}
+
+func (v *Vehicle) RefreshParams() {
+  v.paramsLock.RLock()
+  defer v.paramsLock.RUnlock()
+  v.missingParams = nil
+  v.api.ResetParams()
+}
+
+func (v *Vehicle) MissingParams() []int {
+  v.paramsLock.RLock()
+  defer v.paramsLock.RUnlock()
+  return v.missingParams
+}
+
+func (v *Vehicle) GetAllParams() (uint, uint, map[string]float32) {
+  total, chunk := v.api.AllParams()
+  totalFound := int(total) - len(v.missingParams)
+  return uint(totalFound), total, chunk
 }
 
 //

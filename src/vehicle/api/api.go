@@ -800,6 +800,19 @@ func (v *VehicleApi) GetParam(param string) (float32, error) {
   }
 }
 
+func (v *VehicleApi) GetParamIndex(id uint) (float32, error) {
+  v.lock.RLock()
+  defer v.lock.RUnlock()
+
+  for _, e := range v.params {
+    if e.Index == id {
+      return e.Value, nil
+    }
+  }
+  
+  return 0.0, fmt.Errorf("Param not found.")
+}
+
 func (v *VehicleApi) SetParam(param string, value float32) *mavlink.ParamSet {
   // convert to [16]byte
   var uid [16]byte = [16]byte{0}
@@ -826,6 +839,27 @@ func (v *VehicleApi) ParamsInit() bool {
   v.lock.RLock()
   defer v.lock.RUnlock()
   return v.paramsRequested
+}
+
+func (v *VehicleApi) ResetParams() {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+  v.totalParams = 0
+  v.paramsRequested = false
+  v.paramForceInit = false
+  v.params = make(map[string]*Param)
+}
+
+func (v *VehicleApi) AllParams() (uint, map[string]float32) {
+  v.lock.RLock()
+  defer v.lock.RUnlock()
+
+  vals := make(map[string]float32)
+  for s, e := range v.params {
+    vals[s] = e.Value
+  }
+
+  return v.totalParams, vals
 }
 
 func (v *VehicleApi) CheckParams() (uint, map[uint]bool) {
@@ -870,10 +904,10 @@ func (v *VehicleApi) UpdateFromParam(m *mavlink.ParamValue) {
   // we need to deep copy the param string, to avoid copying over nils
   str := ""
   for _, c := range m.ParamId {
-    str += string(c)
     if c == 0 {
       break
     }
+    str += string(c)
   }
 
   // log.Println(m.ParamIndex, str)
