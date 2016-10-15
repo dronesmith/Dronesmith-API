@@ -345,6 +345,7 @@ func (api *DroneAPI) handleSetParam(veh *vehicle.Vehicle, path string, data map[
 
 func (api *DroneAPI) handleInput(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   t := postData["type"].(string)
+  e := postData["enabled"].(bool)
   if t == "radio" {
     channels := [8]uint16{65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,}
     vals := postData["channels"].([]interface{})
@@ -353,7 +354,7 @@ func (api *DroneAPI) handleInput(veh *vehicle.Vehicle, postData map[string]inter
       arg := e.(float64)
       channels[i] = uint16(arg)
     }
-    veh.SendRCOverride(channels)
+    veh.SendRCOverride(channels, e)
     ret := make(map[string]interface{})
     ret["Status"] = "OK"
     api.SendAPIJSON(ret, w)

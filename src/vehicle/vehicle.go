@@ -14,6 +14,11 @@ import (
   "vehicle/api"
 )
 
+type RCInput struct {
+  Enabled bool
+  Channels [8]uint16
+}
+
 type Vehicle struct {
   address       *net.UDPAddr
   connection    *net.UDPConn
@@ -32,6 +37,8 @@ type Vehicle struct {
   commandLast   int
   commandLastInfo int
   commandSync   sync.RWMutex
+
+  rcInput       chan RCInput
 
   ParamsTimer   time.Time
 }
@@ -56,6 +63,8 @@ func NewVehicle(id string, writer io.Writer) *Vehicle {
   vehicle.api = api.NewVehicleApi(id)
   vehicle.knownMsgs = make(map[string]mavlink.Message)
   vehicle.unknownMsgs = make(map[uint8]*mavlink.Packet)
+
+  vehicle.rcInput = make(chan RCInput)
 
   vehicle.api.AddSubSystem("GPS")
   vehicle.api.AddSubSystem("Estimator")
@@ -90,6 +99,8 @@ func NewVehicle(id string, writer io.Writer) *Vehicle {
   //
   //   vehicle.mavlinkWriter = mavlink.NewEncoder(remoteConn)
   // }
+
+  go vehicle.RCInputListener()
 
   // Check systems are online
   go vehicle.checkOnline()
@@ -641,12 +652,16 @@ func (v *Vehicle) GetAllParams() (uint, uint, map[string]float32) {
   return uint(totalFound), total, chunk
 }
 
-func (v *Vehicle) SendRCOverride(vals [8]uint16) {
-  v.sendMAVLink(&mavlink.RcChannelsOverride{
-    vals[0], vals[1], vals[2], vals[3],
-    vals[4], vals[5], vals[6], vals[7],
-    0, 0,
-  })
+func (v *Vehicle) SendRCOverride(vals [8]uint16, enabled bool) {
+  v.rcInput <- RCInput{enabled, vals}
+
+  if enabled {
+    v.sendMAVLink(&mavlink.RcChannelsOverride{
+      vals[0], vals[1], vals[2], vals[3],
+      vals[4], vals[5], vals[6], vals[7],
+      0, 0,
+    })
+  }
 }
 
 func (v *Vehicle) GetHome() map[string]float32 {
@@ -656,35 +671,24 @@ func (v *Vehicle) GetHome() map[string]float32 {
 func (v *Vehicle) GetGlobal() map[string]float32 {
   return v.api.GetGlobal()
 }
-//
-// func (v *Vehicle) preparePosCtrl(rate float32) float32 {
-//   normal := rate
-//   if normal > 1.0 {
-//     normal = 1.0
-//   }
-//
-//   if normal < 0 {
-//     normal = 0.0
-//   }
-//
-//   if v.api.Mode() != "Position" {
-//     v.SetModeAndArm(true, false, "Position", false)
-//   }
-//
-//   if !v.api.IsArmed() {
-//     v.SetModeAndArm(true, false, "Position", false)
-//   }
-//
-//   return normal
-// }
-//
-// func (v *Vehicle) getRCMappings(kind string) {
-//   param := "RC_MAP_"+kind
-//   if v, err := v.api.GetParam(param); err == nil  {
-//     log.Println(v)
-//   }
-// }
-//
-// func (v *Vehicle) Up(rate float32) {
-//   v.getRCMappings("THROTTLE")
-// }
+
+func (v *Vehicle) RCInputListener() {
+  enabled := false
+  data := [8]uint16{}
+  for {
+    select {
+    case rc := <-v.rcInput:
+      enabled = rc.Enabled
+      data = rc.Channels
+    default:
+      if enabled {
+        v.sendMAVLink(&mavlink.RcChannelsOverride{
+          data[0], data[1], data[2], data[3],
+          data[4], data[5], data[6], data[7],
+          0, 0,
+        })
+      }
+    }
+    time.Sleep(200 * time.Millisecond)
+  }
+}
