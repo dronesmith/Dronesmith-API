@@ -30,6 +30,7 @@ type Vehicle struct {
   syslogQueue   *utils.Deque
 
   commandLast   int
+  commandLastInfo int
   commandSync   sync.RWMutex
 
   ParamsTimer   time.Time
@@ -154,12 +155,12 @@ func (v *Vehicle) sysOnlineHandler() {
   if v.commandQueue.Size() > 0 {
     cmdInt, _ := v.commandQueue.Head()
     cmd := cmdInt.(*api.VehicleCommand)
+    v.commandSync.Lock()
+    v.commandLastInfo = int(cmd.Status)
+    v.commandSync.Unlock()
     if cmd.Status == mavlink.MAV_RESULT_ACCEPTED {
       // got a valid ack, dequeue and send next item
       v.commandQueue.Pop()
-      v.commandSync.Lock()
-      v.commandLast = int(cmd.Command.Command)
-      v.commandSync.Unlock()
     } else if cmd.Status == mavlink.MAV_RESULT_DENIED ||
       cmd.Status == mavlink.MAV_RESULT_UNSUPPORTED ||
       cmd.Status == mavlink.MAV_RESULT_FAILED {
@@ -531,6 +532,16 @@ func (v *Vehicle) SetHome(lat, lon, alt float32, relative bool) {
   v.commandQueue.Push(cmd, mavlink.MAV_CMD_DO_SET_HOME)
 }
 
+func (v *Vehicle) DoGenericCommand(op int, params [7]float32) {
+  cmd := &api.VehicleCommand{
+    Status: 10, // Must be greater than 4 due to MAV_RESULT
+    TimesSent: 0,
+    Command: v.api.PackComandLong(uint16(op), params),
+  }
+
+  v.commandQueue.Push(cmd, op)
+}
+
 func (v *Vehicle) GetSysLog() []*api.VehicleLog {
   var log []*api.VehicleLog
   for !v.syslogQueue.Empty() {
@@ -540,16 +551,28 @@ func (v *Vehicle) GetSysLog() []*api.VehicleLog {
   return log
 }
 
-func (v *Vehicle) GetLastSuccessfulCmd() int {
+func (v *Vehicle) GetLastSuccessfulCmd() (int, string) {
   v.commandSync.RLock()
   defer v.commandSync.RUnlock()
-  return v.commandLast
+
+  str := ""
+  switch (v.commandLastInfo) {
+  case mavlink.MAV_RESULT_ACCEPTED: str = "Command accepted."
+  case mavlink.MAV_RESULT_FAILED: str = "Command was received, but failed."
+  case mavlink.MAV_RESULT_UNSUPPORTED: str = "Command is not supported."
+  case mavlink.MAV_RESULT_DENIED: str = "Command was rejected by the vehicle."
+  case mavlink.MAV_RESULT_TEMPORARILY_REJECTED: str = "Command was rejected by the vehicle, but is supported."
+  default: str = "Command unknown."
+  }
+
+  return v.commandLast, str
 }
 
 func (v *Vehicle) NullLastSuccessfulCmd() {
   v.commandSync.Lock()
   defer v.commandSync.Unlock()
   v.commandLast = 0
+  v.commandLastInfo = -1
 }
 
 func (v *Vehicle) Telem() map[string]interface{} {

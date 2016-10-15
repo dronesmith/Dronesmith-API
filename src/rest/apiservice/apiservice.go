@@ -180,7 +180,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
     switch filteredPath[2] {
     case "mode": api.handleModeArm(veh, pdata, &w)
-    case "command":
+    case "command":api.handleCommand(veh, pdata, &w)
     case "param":
       if len(filteredPath) < 4 {
         api.Send404(&w)
@@ -213,28 +213,7 @@ func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]int
   }
 
   veh.SetModeAndArm(doSetMode, doSetArm, mode, arming)
-  attempts := 0
-  data := make(map[string]interface{})
-  for {
-    if attempts >= 3 {
-      break
-    }
-    time.Sleep(250 * time.Millisecond)
-
-    if veh.GetLastSuccessfulCmd() == 176 {
-      data["Status"] = "OK"
-      data["Command"] = "Set Vehicle Mode and ARM"
-      veh.NullLastSuccessfulCmd()
-      api.SendAPIJSON(data, w)
-      return
-    }
-
-    attempts++
-  }
-
-  data["Status"] = "FAIL"
-  data["Command"] = "Set Vehicle Mode and ARM"
-  api.SendAPIJSON(data, w)
+  api.commandBlock(veh, 176, w)
 }
 
 func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
@@ -266,29 +245,7 @@ func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]int
   }
 
   veh.SetHome(float32(lat), float32(lon), float32(alt), rel)
-
-  attempts := 0
-  data := make(map[string]interface{})
-  for {
-    if attempts >= 3 {
-      break
-    }
-    time.Sleep(250 * time.Millisecond)
-
-    if veh.GetLastSuccessfulCmd() == 179 {
-      data["Status"] = "OK"
-      data["Command"] = "Set Vehicle Home Location"
-      veh.NullLastSuccessfulCmd()
-      api.SendAPIJSON(data, w)
-      return
-    }
-
-    attempts++
-  }
-
-  data["Status"] = "FAIL"
-  data["Command"] = "Set Vehicle Mode and ARM"
-  api.SendAPIJSON(data, w)
+  api.commandBlock(veh, 179, w)
 }
 
 
@@ -379,4 +336,56 @@ func (api *DroneAPI) handleSetParam(veh *vehicle.Vehicle, path string, data map[
     ret["Status"] = "OK"
     api.SendAPIJSON(ret, w)
   }
+}
+
+func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
+  params := [7]float32{}
+  cmd := 0.0
+
+  if postData["command"] == nil {
+    api.SendAPIError(fmt.Errorf("Command is required."), w)
+    return
+  } else {
+    cmd = postData["command"].(float64)
+  }
+
+  if postData["args"] != nil {
+    args := postData["args"].([]interface{})
+    for i, e := range args {
+      f := e.(float64)
+      params[i] = float32(f)
+    }
+  }
+
+  veh.DoGenericCommand(int(cmd), params)
+  api.commandBlock(veh, int(cmd), w)
+}
+
+func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.ResponseWriter) {
+  attempts := 0
+  data := make(map[string]interface{})
+  for {
+    if attempts >= 6 {
+      break
+    }
+    time.Sleep(250 * time.Millisecond)
+
+    if op, ack := veh.GetLastSuccessfulCmd(); op == int(cmd) {
+      // data["Status"] = "OK"
+      data["Status"] = ack
+      data["Command"] = cmd
+      log.Println("Nulling last successful cmd")
+      veh.NullLastSuccessfulCmd()
+      api.SendAPIJSON(data, w)
+      return
+    } else {
+      data["Status"] = ack
+    }
+
+    attempts++
+  }
+
+  // data["Status"] = "FAIL"
+  data["Command"] = cmd
+  api.SendAPIJSON(data, w)
 }

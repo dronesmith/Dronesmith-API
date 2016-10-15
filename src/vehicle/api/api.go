@@ -809,7 +809,7 @@ func (v *VehicleApi) GetParamIndex(id uint) (float32, error) {
       return e.Value, nil
     }
   }
-  
+
   return 0.0, fmt.Errorf("Param not found.")
 }
 
