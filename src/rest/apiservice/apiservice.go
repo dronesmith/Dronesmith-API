@@ -179,6 +179,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     defer req.Body.Close()
 
     switch filteredPath[2] {
+    case "input": api.handleInput(veh, pdata, &w)
     case "mode": api.handleModeArm(veh, pdata, &w)
     case "command":api.handleCommand(veh, pdata, &w)
     case "param":
@@ -336,6 +337,26 @@ func (api *DroneAPI) handleSetParam(veh *vehicle.Vehicle, path string, data map[
     ret["Status"] = "OK"
     api.SendAPIJSON(ret, w)
   }
+}
+
+func (api *DroneAPI) handleInput(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
+  t := postData["type"].(string)
+  if t == "radio" {
+    channels := [8]uint16{65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535,}
+    vals := postData["channels"].([]interface{})
+
+    for i, e := range vals {
+      arg := e.(float64)
+      channels[i] = uint16(arg)
+    }
+    veh.SendRCOverride(channels)
+    ret := make(map[string]interface{})
+    ret["Status"] = "OK"
+    api.SendAPIJSON(ret, w)
+  } else {
+    api.SendAPIError(fmt.Errorf("Invalid input type: " + t), w)
+  }
+
 }
 
 func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {

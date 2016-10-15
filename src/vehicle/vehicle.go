@@ -637,6 +637,27 @@ func (v *Vehicle) GetAllParams() (uint, uint, map[string]float32) {
 // Turtle
 //
 
+/**
+drone.message_factory.rc_channels_override_send(
+    0, 0, # don't take into account ID
+    roll,
+    pitch,
+    throttle,
+    yaw,
+    65535,
+    65535,
+    65535,
+    65535
+*/
+
+func (v *Vehicle) SendRCOverride(vals [8]uint16) {
+  v.sendMAVLink(&mavlink.RcChannelsOverride{
+    vals[0], vals[1], vals[2], vals[3],
+    vals[4], vals[5], vals[6], vals[7],
+    0, 0,
+  })
+}
+
 func (v *Vehicle) preparePosCtrl(rate float32) float32 {
   normal := rate
   if normal > 1.0 {
