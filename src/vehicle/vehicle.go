@@ -493,10 +493,18 @@ func (v *Vehicle) SetModeAndArm(updateMode, updateArm bool, mode string, armed b
     mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
     manualMode = 4
     autoMode = 5
+  case "Auto":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 1
   case "Takeoff":
     mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
     manualMode = 4
-    autoMode = 3
+    autoMode = 2
+  case "Land":
+    mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
+    manualMode = 4
+    autoMode = 6
   case "Mission":
     mainMode |= mavlink.MAV_MODE_FLAG_AUTO_ENABLED | mavlink.MAV_MODE_FLAG_GUIDED_ENABLED | mavlink.MAV_MODE_FLAG_STABILIZE_ENABLED
     manualMode = 4
@@ -643,6 +651,10 @@ func (v *Vehicle) SendRCOverride(vals [8]uint16) {
 
 func (v *Vehicle) GetHome() map[string]float32 {
   return v.api.GetHome()
+}
+
+func (v *Vehicle) GetGlobal() map[string]float32 {
+  return v.api.GetGlobal()
 }
 //
 // func (v *Vehicle) preparePosCtrl(rate float32) float32 {

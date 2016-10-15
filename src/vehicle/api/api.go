@@ -221,6 +221,17 @@ func (v *VehicleApi) GetVehicleTelem() map[string]interface{} {
   return telem
 }
 
+func (v *VehicleApi) GetGlobal() map[string]float32 {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+
+  telem := make(map[string]float32)
+  telem["Altitude"] = v.position.Altitude
+  telem["Longitude"] = v.position.Longitude
+  telem["Latitude"] = v.position.Latitude
+  return telem
+}
+
 func (v *VehicleApi) GetHome() map[string]float32 {
   v.lock.Lock()
   defer v.lock.Unlock()
