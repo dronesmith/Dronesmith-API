@@ -221,6 +221,17 @@ func (v *VehicleApi) GetVehicleTelem() map[string]interface{} {
   return telem
 }
 
+func (v *VehicleApi) GetHome() map[string]float32 {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+
+  telem := make(map[string]float32)
+  telem["Altitude"] = v.home.Altitude
+  telem["Longitude"] = v.home.Longitude
+  telem["Latitude"] = v.home.Latitude
+  return telem
+}
+
 func NewVehicleApi(id string) *VehicleApi {
   log.Println("Vehicle <" + id + "> Init")
   api := &VehicleApi{}

@@ -633,23 +633,6 @@ func (v *Vehicle) GetAllParams() (uint, uint, map[string]float32) {
   return uint(totalFound), total, chunk
 }
 
-//
-// Turtle
-//
-
-/**
-drone.message_factory.rc_channels_override_send(
-    0, 0, # don't take into account ID
-    roll,
-    pitch,
-    throttle,
-    yaw,
-    65535,
-    65535,
-    65535,
-    65535
-*/
-
 func (v *Vehicle) SendRCOverride(vals [8]uint16) {
   v.sendMAVLink(&mavlink.RcChannelsOverride{
     vals[0], vals[1], vals[2], vals[3],
@@ -658,34 +641,38 @@ func (v *Vehicle) SendRCOverride(vals [8]uint16) {
   })
 }
 
-func (v *Vehicle) preparePosCtrl(rate float32) float32 {
-  normal := rate
-  if normal > 1.0 {
-    normal = 1.0
-  }
-
-  if normal < 0 {
-    normal = 0.0
-  }
-
-  if v.api.Mode() != "Position" {
-    v.SetModeAndArm(true, false, "Position", false)
-  }
-
-  if !v.api.IsArmed() {
-    v.SetModeAndArm(true, false, "Position", false)
-  }
-
-  return normal
+func (v *Vehicle) GetHome() map[string]float32 {
+  return v.api.GetHome()
 }
-
-func (v *Vehicle) getRCMappings(kind string) {
-  param := "RC_MAP_"+kind
-  if v, err := v.api.GetParam(param); err == nil  {
-    log.Println(v)
-  }
-}
-
-func (v *Vehicle) Up(rate float32) {
-  v.getRCMappings("THROTTLE")
-}
+//
+// func (v *Vehicle) preparePosCtrl(rate float32) float32 {
+//   normal := rate
+//   if normal > 1.0 {
+//     normal = 1.0
+//   }
+//
+//   if normal < 0 {
+//     normal = 0.0
+//   }
+//
+//   if v.api.Mode() != "Position" {
+//     v.SetModeAndArm(true, false, "Position", false)
+//   }
+//
+//   if !v.api.IsArmed() {
+//     v.SetModeAndArm(true, false, "Position", false)
+//   }
+//
+//   return normal
+// }
+//
+// func (v *Vehicle) getRCMappings(kind string) {
+//   param := "RC_MAP_"+kind
+//   if v, err := v.api.GetParam(param); err == nil  {
+//     log.Println(v)
+//   }
+// }
+//
+// func (v *Vehicle) Up(rate float32) {
+//   v.getRCMappings("THROTTLE")
+// }

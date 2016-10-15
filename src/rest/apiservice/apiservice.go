@@ -10,6 +10,7 @@ import (
   "time"
   "strconv"
 
+  "mavlink/parser"
   "cloud"
   "dronemanager"
   "vehicle"
@@ -179,6 +180,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     defer req.Body.Close()
 
     switch filteredPath[2] {
+    case "takeoff": api.handleTakeoff(veh, pdata, &w)
     case "input": api.handleInput(veh, pdata, &w)
     case "mode": api.handleModeArm(veh, pdata, &w)
     case "command":api.handleCommand(veh, pdata, &w)
@@ -380,6 +382,40 @@ func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]int
 
   veh.DoGenericCommand(int(cmd), params)
   api.commandBlock(veh, int(cmd), w)
+}
+
+func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
+  params := [7]float32{}
+  home := veh.GetHome()
+
+  if postData["heading"] != nil {
+    val := postData["heading"].(float64)
+    params[3] = float32(val)
+  }
+
+  if postData["altitude"] != nil {
+    val := postData["altitude"].(float64)
+    params[6] = float32(val) + home["Altitude"]
+  } else {
+    params[6] = 10 + home["Altitude"]
+  }
+
+  if postData["lat"] != nil {
+    val := postData["lat"].(float64)
+    params[4] = float32(val)
+  } else {
+    params[4] = home["Latitude"]
+  }
+
+  if postData["long"] != nil {
+    val := postData["long"].(float64)
+    params[5] = float32(val)
+  } else {
+    params[5] = home["Longitude"]
+  }
+
+  veh.DoGenericCommand(mavlink.MAV_CMD_NAV_TAKEOFF, params)
+  api.commandBlock(veh, mavlink.MAV_CMD_NAV_TAKEOFF, w)
 }
 
 func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.ResponseWriter) {
