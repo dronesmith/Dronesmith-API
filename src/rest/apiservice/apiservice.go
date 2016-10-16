@@ -20,6 +20,7 @@ type DroneAPI struct {
   port uint
   manager *dronemanager.DroneManager
   idRgxp *regexp.Regexp
+  nameRgxp *regexp.Regexp
   spltRgxp *regexp.Regexp
 }
 
@@ -29,6 +30,7 @@ func NewDroneAPI(port uint) *DroneAPI {
   api.manager = dronemanager.NewDroneManager(api.port)
 
   api.idRgxp = regexp.MustCompile("[a-z0-9]{24}")
+  api.nameRgxp = regexp.MustCompile("[A-Za-z0-9]{5,24}")
   api.spltRgxp = regexp.MustCompile("/")
 
   go api.manager.Listen()
@@ -105,7 +107,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   }
 
   // TODO match with name.
-  if !api.idRgxp.MatchString(filteredPath[1]) {
+  if !api.idRgxp.MatchString(filteredPath[1]) && !api.nameRgxp.MatchString(filteredPath[1]) {
     api.Send404(&w)
     return
   }

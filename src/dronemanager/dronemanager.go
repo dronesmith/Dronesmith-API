@@ -259,7 +259,19 @@ func (m *DroneManager) handleMavlink(chunk []byte, id uint32) {
 func (m *DroneManager) FindVehicle(id string) *vehicle.Vehicle {
   m.sessionLock.Lock()
   defer m.sessionLock.Unlock()
+  log.Println("Finding vehicle:", id)
   for _ , session := range m.sessions {
+
+    log.Println(session.Drone)
+
+    // Check if name matches first.
+    if session.Drone["name"] != nil {
+      n := session.Drone["name"].(string)
+      if n == id {
+        return session.veh
+      }
+    }
+
     dId := session.Drone["_id"].(string)
     if dId == id {
       return session.veh
