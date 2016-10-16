@@ -30,6 +30,13 @@ type DLTracker struct {
   Session Session
 }
 
+// TODO - remove this from memory, or encrypt it.
+type SessAuth struct {
+  Email string
+  Pass string
+  Serial string
+}
+
 type DroneManager struct {
   port uint
   keenBatch *keen.BatchClient
@@ -62,7 +69,9 @@ type Session struct {
   User    string
   link    SessConn
   lastUpdate time.Time
+  syncCloud time.Time
   veh *vehicle.Vehicle
+  auth    SessAuth
 }
 
 func (s *Session) genRandomId() {
@@ -183,7 +192,9 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
       Drone: resp.Drone,
       User: userId,
       lastUpdate: time.Now(),
+      syncCloud: time.Now(),
       link: SessConn{0, m.conn, addr,},
+      auth: SessAuth{msg.Email, msg.Password, msg.Serial},
     }
 
     sessObj.genId()
@@ -223,13 +234,22 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
 }
 
 func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPAddr, id uint32) {
-
   m.sessionLock.Lock()
   defer m.sessionLock.Unlock()
+
   if _, found := m.sessions[id]; found {
     // make sure this is ref so we update the timestamp.
     sessObj := m.sessions[id]
     sessObj.lastUpdate = time.Now()
+
+    if time.Now().Sub(sessObj.syncCloud) > 60 * time.Second {
+      if resp, err := cloud.RequestDroneInfo(sessObj.auth.Serial, sessObj.auth.Email, sessObj.auth.Pass); err != nil {
+        log.Println("Warning failed to get new drone metadata:", err)
+      } else {
+        sessObj.Drone = resp.Drone
+      }
+      sessObj.syncCloud = time.Now()
+    }
 
     if msg, err := dronedp.GenerateMsg(dronedp.OP_STATUS, sessObj.id, sessObj); err != nil {
       log.Println("Could not build D2P MSG:", err)
@@ -261,8 +281,6 @@ func (m *DroneManager) FindVehicle(id string) *vehicle.Vehicle {
   defer m.sessionLock.Unlock()
   log.Println("Finding vehicle:", id)
   for _ , session := range m.sessions {
-
-    log.Println(session.Drone)
 
     // Check if name matches first.
     if session.Drone["name"] != nil {

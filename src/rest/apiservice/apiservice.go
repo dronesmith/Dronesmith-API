@@ -30,7 +30,7 @@ func NewDroneAPI(port uint) *DroneAPI {
   api.manager = dronemanager.NewDroneManager(api.port)
 
   api.idRgxp = regexp.MustCompile("[a-z0-9]{24}")
-  api.nameRgxp = regexp.MustCompile("[A-Za-z0-9]{5,24}")
+  api.nameRgxp = regexp.MustCompile("[A-Za-z0-9-]{5,24}")
   api.spltRgxp = regexp.MustCompile("/")
 
   go api.manager.Listen()
