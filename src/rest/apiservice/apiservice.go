@@ -182,6 +182,16 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     defer req.Body.Close()
 
     switch filteredPath[2] {
+    case "ssh":
+      if len(filteredPath) < 4 {
+        api.Send404(&w)
+      } else {
+        if filteredPath[3] == "open" {
+          api.handleTerminal(&w, filteredPath[1], true)
+        } else if filteredPath[3] == "close" {
+          api.handleTerminal(&w, filteredPath[1], false)
+        }
+      }
     case "takeoff": api.handleTakeoff(veh, pdata, &w)
     case "land": api.handleLand(veh, pdata, &w)
     case "goto": api.handleGuided(veh, pdata, &w)
@@ -221,6 +231,18 @@ func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]int
 
   veh.SetModeAndArm(doSetMode, doSetArm, mode, arming)
   api.commandBlock(veh, 176, w)
+}
+
+func (api *DroneAPI) handleTerminal(w *http.ResponseWriter, id string, enable bool) {
+  api.manager.UpdateTerminal(id, enable)
+  // if res, err := vehicle.UpdateTerminal(enable); err != nil {
+  //   api.SendAPIError(fmt.Errorf(err), w)
+  // } else {
+  //   pData := make(map[string]interface{})
+  //   pData["Status"] = "OK"
+  //   log.Println(res)
+  //   api.SendAPIJSON(pData)
+  // }
 }
 
 func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {

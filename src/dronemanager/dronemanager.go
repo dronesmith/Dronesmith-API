@@ -65,6 +65,7 @@ func (sw *SessConn) Write(p []byte) (n int, err error) {
 type Session struct {
   id      uint32
   State   string
+  Terminal bool
   Drone   map[string]interface{}
   User    string
   link    SessConn
@@ -177,6 +178,7 @@ func (m *DroneManager) handleStatusMessage(msg *dronedp.StatusMsg, addr *net.UDP
   switch msg.Op {
   case "connect": m.handleStatusConnect(msg, addr)
   case "status": m.handleStatusUpdate(msg, addr, session)
+  case "terminal": m.handleStatusTerminal(msg, addr, session)
   }
 }
 
@@ -261,6 +263,22 @@ func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPA
   }
 }
 
+func (m *DroneManager) handleStatusTerminal(msg *dronedp.StatusMsg, addr *net.UDPAddr, id uint32) {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+
+  if _, found := m.sessions[id]; found {
+    // make sure this is ref so we update the timestamp.
+    sessObj := m.sessions[id]
+
+    //{msg: data.msg, status: data.status,
+    //  drone: statusObj.drone, session: sess}
+
+    log.Println("got terminal", sessObj, msg)
+
+  }
+}
+
 func (m *DroneManager) handleMavlink(chunk []byte, id uint32) {
   m.sessionLock.Lock()
   defer m.sessionLock.Unlock()
@@ -271,6 +289,31 @@ func (m *DroneManager) handleMavlink(chunk []byte, id uint32) {
 
     // Time to get swchifty
     sessObj.veh.ProcessPacket(chunk)
+  }
+}
+
+// Remember to update the find pattern in the future.
+func (m *DroneManager) UpdateTerminal(id string, enable bool) {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+
+  for k , session := range m.sessions {
+    // Check if name matches first.
+    if session.Drone["name"] != nil {
+      n := session.Drone["name"].(string)
+      if n == id {
+        log.Println("Setting terminal to", enable, "on", k)
+        session.Terminal = enable
+        return
+      }
+    }
+
+    dId := session.Drone["_id"].(string)
+    if dId == id {
+      log.Println("Setting terminal to", enable, "on", k)
+      session.Terminal = enable
+      return
+    }
   }
 }
 
