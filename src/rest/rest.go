@@ -24,7 +24,12 @@ const (
 
 var (
   GIT string
+  initTime time.Time
 )
+
+func init() {
+  initTime = time.Now()
+}
 
 type RestServer struct {
   port int
@@ -46,13 +51,14 @@ func (r *RestServer) handleForward(w http.ResponseWriter, req *http.Request) {
 func (r *RestServer) whoami(w http.ResponseWriter, req *http.Request) {
   log.Println("REQUEST", req.Method, req.URL.Path)
   fmt.Fprintf(w,
-    "<html><head><title>%s</title></head><body><p>%s</p></body></html>",
+    "<html><head><title>%s</title></head><body><h1>%s</h1><p>%s</p></body></html>",
     "Dronesmith Technologies",
+    "Hello, 世界.",
     "Dronesmith Core v" + VER + " (Git Hash " + GIT + ")" + "<br>" +
      runtime.Version() + " engine on a " + runtime.GOARCH + " " + runtime.GOOS + " system, with " +
      strconv.Itoa(runtime.NumGoroutine()) + " jobs running across " +
      strconv.Itoa(runtime.NumCPU()) +  " logical cores." +
-      "<br>Proudly crafted with ♥ in "+LOC+"<br>Current local time: "+time.Now().String())
+      "<br>Proudly crafted with ♥ in "+LOC+"<br>System was last launched at "+initTime.String())
 }
 
 func (r *RestServer) Listen() {
