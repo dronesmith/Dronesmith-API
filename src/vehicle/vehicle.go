@@ -16,6 +16,7 @@ import (
 
 type RCInput struct {
   Enabled bool
+  Timeout uint
   Channels [8]uint16
 }
 
@@ -652,8 +653,8 @@ func (v *Vehicle) GetAllParams() (uint, uint, map[string]float32) {
   return uint(totalFound), total, chunk
 }
 
-func (v *Vehicle) SendRCOverride(vals [8]uint16, enabled bool) {
-  v.rcInput <- RCInput{enabled, vals}
+func (v *Vehicle) SendRCOverride(vals [8]uint16, enabled bool, timestamp uint) {
+  v.rcInput <- RCInput{enabled, timestamp, vals}
 
   if enabled {
     v.sendMAVLink(&mavlink.RcChannelsOverride{
@@ -675,11 +676,14 @@ func (v *Vehicle) GetGlobal() map[string]float32 {
 func (v *Vehicle) RCInputListener() {
   enabled := false
   data := [8]uint16{}
+  lastReceived := time.Now()
+  var rcTimeOut uint
   for {
     select {
     case rc := <-v.rcInput:
       enabled = rc.Enabled
       data = rc.Channels
+      rcTimeOut = rc.Timeout
     default:
       if enabled {
         v.sendMAVLink(&mavlink.RcChannelsOverride{
@@ -687,6 +691,14 @@ func (v *Vehicle) RCInputListener() {
           data[4], data[5], data[6], data[7],
           0, 0,
         })
+
+        curr := time.Now()
+
+        if (rcTimeOut > 0) && (curr.Sub(lastReceived) > time.Duration(rcTimeOut) * time.Millisecond) {
+          enabled = false
+        } else {
+          lastReceived = time.Now()
+        }
       }
     }
     time.Sleep(200 * time.Millisecond)
