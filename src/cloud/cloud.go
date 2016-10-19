@@ -22,9 +22,10 @@ type UserDroneInfoRes struct {
   Drone   map[string]interface{} `json:"drone"`
 }
 
-func RequestDroneInfo(serial, user, pass string) (*UserDroneInfoRes, error) {
+func RequestDroneInfo(serial, simId, user, pass string) (*UserDroneInfoRes, error) {
   postData := map[string]string {
     "serialId": serial,
+    "simId": simId,
     "email": user,
     "password": pass,
   }

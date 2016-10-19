@@ -45,7 +45,7 @@ func NewRestServer(addr int) *RestServer {
 
 func (r *RestServer) handleForward(w http.ResponseWriter, req *http.Request) {
   log.Println("REQUEST", req.Method, req.URL.Path)
-  http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 301)
+  http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 302)
 }
 
 func (r *RestServer) whoami(w http.ResponseWriter, req *http.Request) {

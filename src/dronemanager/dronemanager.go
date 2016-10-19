@@ -35,6 +35,7 @@ type SessAuth struct {
   Email string
   Pass string
   Serial string
+  SimId string
 }
 
 type DroneManager struct {
@@ -183,7 +184,7 @@ func (m *DroneManager) handleStatusMessage(msg *dronedp.StatusMsg, addr *net.UDP
 }
 
 func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDPAddr) {
-  if resp, err := cloud.RequestDroneInfo(msg.Serial, msg.Email, msg.Password); err != nil {
+  if resp, err := cloud.RequestDroneInfo(msg.Serial, msg.SimId, msg.Email, msg.Password); err != nil {
     log.Println("Auth failed:", err)
   } else {
 
@@ -196,7 +197,7 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
       lastUpdate: time.Now(),
       syncCloud: time.Now(),
       link: SessConn{0, m.conn, addr,},
-      auth: SessAuth{msg.Email, msg.Password, msg.Serial},
+      auth: SessAuth{msg.Email, msg.Password, msg.Serial, msg.SimId},
     }
 
     sessObj.genId()
@@ -245,7 +246,7 @@ func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPA
     sessObj.lastUpdate = time.Now()
 
     if time.Now().Sub(sessObj.syncCloud) > 60 * time.Second {
-      if resp, err := cloud.RequestDroneInfo(sessObj.auth.Serial, sessObj.auth.Email, sessObj.auth.Pass); err != nil {
+      if resp, err := cloud.RequestDroneInfo(sessObj.auth.Serial, sessObj.auth.SimId, sessObj.auth.Email, sessObj.auth.Pass); err != nil {
         log.Println("Warning failed to get new drone metadata:", err)
       } else {
         sessObj.Drone = resp.Drone

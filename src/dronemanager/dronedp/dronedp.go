@@ -39,14 +39,12 @@ type StatusMsg struct {
   Op        string          `json:"op"`
 
   Serial    string          `json:"serialId,omitempty"`
+  SimId     string          `json:"simid,omitempty"`
   Email     string          `json:"email,omitempty"`
   Password  string          `json:"password,omitempty"`
   Drone     map[string]interface{}     `json:"drone,omitempty"`
   User      string          `json:"user,omitempty"`
-  Code      string          `json:"codeBuffer,omitempty"`
   Terminal  bool            `json:"terminal,omitempty"`
-  Cmd       mavlink.CommandLong `json:"cmdBuffer,omitempty"`
-  Sensors   map[string]float64 `json:"sensors,omitempty"`
 }
 
 type CodeMsg struct {
