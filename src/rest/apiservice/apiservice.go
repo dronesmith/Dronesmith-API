@@ -234,15 +234,47 @@ func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]int
 }
 
 func (api *DroneAPI) handleTerminal(w *http.ResponseWriter, id string, enable bool) {
+  if enable && api.manager.GetTerminal(id) != nil {
+    api.SendAPIError(fmt.Errorf("SSH Proxy already open."), w)
+    return
+  } else if !enable && api.manager.GetTerminal(id) == nil {
+    api.SendAPIError(fmt.Errorf("SSH Proxy already closed."), w)
+    return
+  }
+
   api.manager.UpdateTerminal(id, enable)
-  // if res, err := vehicle.UpdateTerminal(enable); err != nil {
-  //   api.SendAPIError(fmt.Errorf(err), w)
-  // } else {
-  //   pData := make(map[string]interface{})
-  //   pData["Status"] = "OK"
-  //   log.Println(res)
-  //   api.SendAPIJSON(pData)
-  // }
+
+  attempts := 0
+  for {
+    if data := api.manager.GetTerminal(id); data != nil {
+      if enable { // we requested terminal to be open, and it we got data.
+        pData := make(map[string]interface{})
+        pData["Status"] = "OK"
+        pData["Info"] = data
+        log.Println(pData)
+        api.SendAPIJSON(pData, w)
+        return
+      }
+    } else if data == nil {
+      if !enable { // we requested the terminal to close, and it closed.
+        pData := make(map[string]interface{})
+        pData["Status"] = "OK"
+        api.SendAPIJSON(pData, w)
+        return
+      }
+    }
+    time.Sleep(500 * time.Millisecond)
+    attempts++
+    if attempts > 5 {
+      if enable {
+        api.SendAPIError(fmt.Errorf("Could not create SSH Proxy."), w)
+      } else {
+        api.SendAPIError(fmt.Errorf("Could not close SSH Proxy."), w)
+      }
+      return
+    }
+  }
+
 }
 
 func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {

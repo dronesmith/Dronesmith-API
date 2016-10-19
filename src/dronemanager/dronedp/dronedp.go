@@ -24,6 +24,7 @@ const (
   // Ops
   OP_STATUS OP = 0x10
   OP_CODE OP = 0x11
+  OP_TERMINAL OP = 0x12
   OP_MAVLINK_TEXT OP = 0xFD
   OP_MAVLINK_BIN OP = 0xFE
 )
@@ -179,6 +180,10 @@ func ParseMsg(data []byte) (*Msg, error) {
 
   case OP_STATUS:
     msg.Data = &StatusMsg{}
+    err = json.Unmarshal(decoded, msg.Data)
+
+  case OP_TERMINAL:
+    msg.Data = &TerminalMsg{}
     err = json.Unmarshal(decoded, msg.Data)
 
   case OP_CODE:

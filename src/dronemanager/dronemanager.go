@@ -64,16 +64,17 @@ func (sw *SessConn) Write(p []byte) (n int, err error) {
 }
 
 type Session struct {
-  id      uint32
-  State   string
-  Terminal bool
-  Drone   map[string]interface{}
-  User    string
-  link    SessConn
-  lastUpdate time.Time
-  syncCloud time.Time
-  veh *vehicle.Vehicle
-  auth    SessAuth
+  id            uint32
+  State         string
+  Terminal      bool
+  Drone         map[string]interface{}
+  User          string
+  link          SessConn
+  lastUpdate    time.Time
+  syncCloud     time.Time
+  veh           *vehicle.Vehicle
+  auth          SessAuth
+  terminal      dronedp.TerminalInfo
 }
 
 func (s *Session) genRandomId() {
@@ -169,6 +170,9 @@ func (m *DroneManager) handleMessage(decoded *dronedp.Msg, addr *net.UDPAddr) {
   case dronedp.OP_STATUS:
     statusMsg := decoded.Data.(*dronedp.StatusMsg)
     m.handleStatusMessage(statusMsg, addr, decoded.Session)
+  case dronedp.OP_TERMINAL:
+    terminalMsg := decoded.Data.(*dronedp.TerminalMsg)
+    m.handleStatusTerminal(terminalMsg, addr, decoded.Session)
   case dronedp.OP_MAVLINK_BIN:
     mavChunk := decoded.Data.([]byte)
     m.handleMavlink(mavChunk, decoded.Session)
@@ -179,7 +183,6 @@ func (m *DroneManager) handleStatusMessage(msg *dronedp.StatusMsg, addr *net.UDP
   switch msg.Op {
   case "connect": m.handleStatusConnect(msg, addr)
   case "status": m.handleStatusUpdate(msg, addr, session)
-  case "terminal": m.handleStatusTerminal(msg, addr, session)
   }
 }
 
@@ -264,7 +267,7 @@ func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPA
   }
 }
 
-func (m *DroneManager) handleStatusTerminal(msg *dronedp.StatusMsg, addr *net.UDPAddr, id uint32) {
+func (m *DroneManager) handleStatusTerminal(msg *dronedp.TerminalMsg, addr *net.UDPAddr, id uint32) {
   m.sessionLock.Lock()
   defer m.sessionLock.Unlock()
 
@@ -275,8 +278,9 @@ func (m *DroneManager) handleStatusTerminal(msg *dronedp.StatusMsg, addr *net.UD
     //{msg: data.msg, status: data.status,
     //  drone: statusObj.drone, session: sess}
 
-    log.Println("got terminal", sessObj, msg)
+    log.Println("Got terminal on", id)
 
+    sessObj.terminal = msg.Msg
   }
 }
 
@@ -298,45 +302,65 @@ func (m *DroneManager) UpdateTerminal(id string, enable bool) {
   m.sessionLock.Lock()
   defer m.sessionLock.Unlock()
 
-  for k , session := range m.sessions {
-    // Check if name matches first.
-    if session.Drone["name"] != nil {
-      n := session.Drone["name"].(string)
-      if n == id {
-        log.Println("Setting terminal to", enable, "on", k)
-        session.Terminal = enable
-        return
-      }
-    }
+  k := m.searchVehicle(id)
+  if sess, f := m.sessions[k]; f {
+    log.Println("Setting terminal to", enable, "on", k)
+    sess.Terminal = enable
 
-    dId := session.Drone["_id"].(string)
-    if dId == id {
-      log.Println("Setting terminal to", enable, "on", k)
-      session.Terminal = enable
-      return
+    if !enable {
+      // delete terminal info
+      sess.terminal = dronedp.TerminalInfo{}
     }
+  }
+}
+
+func (m *DroneManager) GetTerminal(id string) map[string]interface{} {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+
+  k := m.searchVehicle(id)
+  if sess, f := m.sessions[k]; f {
+    m := make(map[string]interface{})
+    if sess.terminal.Url != "" && sess.terminal.Port != 0 {
+      m["url"] = sess.terminal.Url
+      m["port"] = sess.terminal.Port
+      return m
+    } else {
+      return nil
+    }
+  } else {
+    return nil
   }
 }
 
 // Find a vehicle. Just a sequential search for now, in the future we
 // might need to refactor this.
-func (m *DroneManager) FindVehicle(id string) *vehicle.Vehicle {
-  m.sessionLock.Lock()
-  defer m.sessionLock.Unlock()
-  for _ , session := range m.sessions {
-
-    // Check if name matches first.
+func (m *DroneManager) searchVehicle(id string) uint32 {
+  for k , session := range m.sessions {
     if session.Drone["name"] != nil {
       n := session.Drone["name"].(string)
       if n == id {
-        return session.veh
+        return k
+      }
+
+      dId := session.Drone["_id"].(string)
+      if dId == id {
+        return k
       }
     }
+  }
 
-    dId := session.Drone["_id"].(string)
-    if dId == id {
-      return session.veh
-    }
+  return 0
+}
+
+func (m *DroneManager) FindVehicle(id string) *vehicle.Vehicle {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+
+  if sess, f := m.sessions[m.searchVehicle(id)]; f {
+    return sess.veh
+  } else {
+    return nil
   }
 
   return nil
