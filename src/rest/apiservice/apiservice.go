@@ -141,6 +141,10 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
       return
     }
 
+    if droneData["online"] != true {
+      api.SendAPIError(fmt.Errorf("Drone not online."), &w)
+    }
+
     chunk := veh.Telem()
 
     switch filteredPath[2] {

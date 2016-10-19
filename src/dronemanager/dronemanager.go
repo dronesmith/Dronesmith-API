@@ -191,7 +191,10 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
     log.Println("Auth failed:", err)
   } else {
 
-    userId := resp.User["_id"].(string)
+    var userId string
+    if resp.User["_id"] != nil {
+      userId = resp.User["_id"].(string)
+    }
 
     sessObj := &Session{
       State: "online",
@@ -337,6 +340,7 @@ func (m *DroneManager) GetTerminal(id string) map[string]interface{} {
 // might need to refactor this.
 func (m *DroneManager) searchVehicle(id string) uint32 {
   for k , session := range m.sessions {
+    // log.Println(k, session)
     if session.Drone["name"] != nil {
       n := session.Drone["name"].(string)
       if n == id {
