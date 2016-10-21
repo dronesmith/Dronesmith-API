@@ -186,6 +186,8 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     defer req.Body.Close()
 
     switch filteredPath[2] {
+    case "arm": api.handleArmDisarm(veh, true, &w)
+    case "disarm": api.handleArmDisarm(veh, false, &w)
     case "ssh":
       if len(filteredPath) < 4 {
         api.Send404(&w)
@@ -215,6 +217,11 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     // forward
     http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 301)
   }
+}
+
+func (api *DroneAPI) handleArmDisarm(veh *vehicle.Vehicle, arming bool, w *http.ResponseWriter) {
+  veh.SetModeAndArm(false, true, "", arming)
+  api.commandBlock(veh, 176, w)
 }
 
 func (api *DroneAPI) handleModeArm(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {

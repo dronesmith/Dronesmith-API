@@ -684,6 +684,7 @@ func (v *Vehicle) RCInputListener() {
       enabled = rc.Enabled
       data = rc.Channels
       rcTimeOut = rc.Timeout
+      lastReceived = time.Now()
     default:
       if enabled {
         v.sendMAVLink(&mavlink.RcChannelsOverride{
@@ -696,8 +697,6 @@ func (v *Vehicle) RCInputListener() {
 
         if (rcTimeOut > 0) && (curr.Sub(lastReceived) > time.Duration(rcTimeOut) * time.Millisecond) {
           enabled = false
-        } else {
-          lastReceived = time.Now()
         }
       }
     }
