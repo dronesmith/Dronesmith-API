@@ -39,7 +39,7 @@ func NewDroneAPI(port uint) *DroneAPI {
 }
 
 func (api *DroneAPI) Send404(w *http.ResponseWriter) {
-  http.Error(*w, http.StatusText(404), 404)
+  (*w).WriteHeader(http.StatusNotFound)
 }
 
 func (api *DroneAPI) Send403(w *http.ResponseWriter) {
@@ -139,10 +139,6 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     if len(filteredPath) < 3 {
       api.SendAPIJSON(droneData, &w)
       return
-    }
-
-    if droneData["online"] != true {
-      api.SendAPIError(fmt.Errorf("Drone not online."), &w)
     }
 
     chunk := veh.Telem()
@@ -530,7 +526,7 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
   params := [7]float32{}
   home := veh.GetHome()
 
-  veh.SetModeAndArm(true, true, "Auto", true)
+  veh.SetModeAndArm(true, true, "Takeoff", true)
 
   if postData["heading"] != nil {
     val := postData["heading"].(float64)

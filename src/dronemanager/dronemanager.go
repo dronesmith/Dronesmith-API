@@ -150,8 +150,14 @@ func (m *DroneManager) Listen() {
 
   for {
     n,addr,err := m.conn.ReadFromUDP(buf)
+    // log.Println("Got a message from", addr, "of size", n)
     if err != nil {
       log.Println("Error: ",err)
+    }
+
+    if n < 8 {
+      log.Println("Warning: Recevied message too small")
+      continue
     }
 
     if decoded, err := dronedp.ParseMsg(buf[0:n]); err != nil {
