@@ -168,6 +168,8 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
         api.handleGetAllParams(veh, &w)
       } else if filteredPath[3] == "refresh" {
         api.handleRefreshParams(veh, &w)
+      } else {
+        api.Send404(&w)
       }
     default: api.Send404(&w)
     }
@@ -285,25 +287,26 @@ func (api *DroneAPI) handleTerminal(w *http.ResponseWriter, id string, enable bo
 }
 
 func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
+  home := veh.GetHome()
 
   var lat, lon, alt float64
   var rel bool
   if postData["lat"] != nil {
     lat = postData["lat"].(float64)
   } else {
-    lat = 0.0
+    lat = float64(home["Latitude"])
   }
 
   if postData["lon"] != nil {
     lon = postData["lon"].(float64)
   } else {
-    lat = 0.0
+    lon = float64(home["Longitude"])
   }
 
   if postData["alt"] != nil {
     alt = postData["alt"].(float64)
   } else {
-    alt = 0.0
+    alt = float64(home["Altitude"])
   }
 
   if postData["relative"] != nil {
@@ -562,7 +565,7 @@ func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.Respons
   attempts := 0
   data := make(map[string]interface{})
   for {
-    if attempts >= 6 {
+    if attempts >= 10 {
       break
     }
     time.Sleep(250 * time.Millisecond)
