@@ -673,6 +673,10 @@ func (v *Vehicle) GetGlobal() map[string]float32 {
   return v.api.GetGlobal()
 }
 
+func (v *Vehicle) GetMASLAlt() float32 {
+  return v.api.GetMASLAlt()
+}
+
 func (v *Vehicle) RCInputListener() {
   enabled := false
   data := [8]uint16{}

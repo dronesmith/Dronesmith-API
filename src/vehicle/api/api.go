@@ -243,6 +243,12 @@ func (v *VehicleApi) GetHome() map[string]float32 {
   return telem
 }
 
+func (v *VehicleApi) GetMASLAlt() float32 {
+  v.lock.Lock()
+  defer v.lock.Unlock()
+  return v.target.Altitude
+}
+
 func NewVehicleApi(id string) *VehicleApi {
   log.Println("Vehicle <" + id + "> Init")
   api := &VehicleApi{}

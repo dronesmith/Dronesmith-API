@@ -483,7 +483,7 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
   params := [7]float32{}
   loc := veh.GetGlobal()
 
-  // veh.SetModeAndArm(true, true, "Hold", true)
+  veh.SetModeAndArm(true, false, "Hold", true)
 
   if postData["speed"] != nil {
     val := postData["speed"].(float64)
@@ -499,9 +499,9 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
 
   if postData["altitude"] != nil {
     val := postData["altitude"].(float64)
-    params[6] = float32(val) + loc["Altitude"]
+    params[6] = float32(val) + veh.GetMASLAlt()
   } else {
-    params[6] = loc["Altitude"]
+    params[6] = veh.GetMASLAlt()
   }
 
   if postData["lat"] != nil {
@@ -511,8 +511,8 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
     params[4] = loc["Latitude"]
   }
 
-  if postData["long"] != nil {
-    val := postData["long"].(float64)
+  if postData["lon"] != nil {
+    val := postData["lon"].(float64)
     params[5] = float32(val) + loc["Longitude"]
   } else {
     params[5] = loc["Longitude"]
