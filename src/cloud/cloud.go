@@ -8,9 +8,13 @@ import (
   // "log"
 )
 
-const (
-  CLOUD_ADDR = "http://localhost:4000"
+var (
+  CLOUD_ADDR string
 )
+
+func InitCloud(addr string) {
+  CLOUD_ADDR = addr
+}
 
 //
 // Static method. Asks the Cloud for drone information.

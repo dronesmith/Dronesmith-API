@@ -18,7 +18,7 @@ import (
 )
 
 const (
-  LOC = "Las Vegas, USA"
+  LOC = "New York City, USA"
   VER = "1.0.0"
 )
 
@@ -61,9 +61,9 @@ func (r *RestServer) whoami(w http.ResponseWriter, req *http.Request) {
       "<br>Proudly crafted with ♥ in "+LOC+"<br>System was last launched at "+initTime.String())
 }
 
-func (r *RestServer) Listen() {
+func (r *RestServer) Listen(port int) {
   r.apiMux = http.NewServeMux()
-  r.droneApi = apiservice.NewDroneAPI(4002)
+  r.droneApi = apiservice.NewDroneAPI(uint(port))
 
   r.apiMux.Handle(      "/drone/",    r.droneApi)
   r.apiMux.HandleFunc(  "/user/",     r.handleForward)
