@@ -1,3 +1,15 @@
+/**
+ * Dronesmith API
+ *
+ * Authors
+ *  Geoff Gardner <geoff@dronesmith.io>
+ *
+ * Copyright (C) 2016 Dronesmith Technologies Inc, all rights reserved.
+ * Unauthorized copying of any source code or assets within this project, via
+ * any medium is strictly prohibited.
+ *
+ * Proprietary and confidential.
+ */
 
 //
 // Server level logic for API core. The actual lib can be embedded into
