@@ -1,7 +1,7 @@
 package apiservice
 
 import (
-  "log"
+  "logger"
   "fmt"
   "math"
   "net/http"
@@ -78,12 +78,12 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   defer func() {
     if r := recover(); r != nil {
       w.WriteHeader(500)
-      log.Println("Request paniced!", r)
+      logger.Warn("Request paniced!", r)
       fmt.Fprintf(w, "I couldn't parse your request. Make sure you are formating your JSON properly, including types.\n")
     }
   }()
 
-  log.Println("REQUEST", req.Method, req.URL.Path)
+  logger.Info("REQUEST", req.Method, req.URL.Path)
 
   paths := api.spltRgxp.Split(req.URL.Path, -1)
   email := req.Header.Get("User-Email")
@@ -260,7 +260,6 @@ func (api *DroneAPI) handleTerminal(w *http.ResponseWriter, id string, enable bo
         pData := make(map[string]interface{})
         pData["Status"] = "OK"
         pData["Info"] = data
-        log.Println(pData)
         api.SendAPIJSON(pData, w)
         return
       }
@@ -574,7 +573,7 @@ func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.Respons
       // data["Status"] = "OK"
       data["Status"] = ack
       data["Command"] = cmd
-      log.Println("Nulling last successful cmd")
+      logger.Debug("Nulling last successful cmd")
       veh.NullLastSuccessfulCmd()
       api.SendAPIJSON(data, w)
       return

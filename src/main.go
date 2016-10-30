@@ -9,7 +9,7 @@ package main
 import (
   "cloud"
   "flag"
-  "log"
+  "logger"
   // "vehicle"
   // "dronemanager"
   "rest"
@@ -25,9 +25,8 @@ func main() {
   cloudAddr := flag.String("cloud", "http://localhost:4000", "Connection to the cloud.")
 
   flag.Parse()
-  log.SetPrefix("[API] ")
 
-  log.Println("API Service Init...")
+  logger.Info("API Service Init...")
 
   // vehicle := vehicle.NewVehicle(*ipAddr, *remoteAddr)
   // defer vehicle.Close()

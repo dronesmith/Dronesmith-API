@@ -1,7 +1,7 @@
 package dronemanager
 
 import (
-  "log"
+  "logger"
   "os"
   "strconv"
   "net"
@@ -91,7 +91,7 @@ func (s *Session) genId() {
 
 func CheckError(err error) {
     if err != nil {
-        log.Println("Error: " , err)
+        logger.Error("Error: " , err)
         os.Exit(1)
     }
 }
@@ -114,8 +114,8 @@ func (m *DroneManager) checkTimers() {
     for id, sess := range m.sessions {
       if time.Now().Sub(sess.lastUpdate) > (5 * time.Second) {
         dId := sess.Drone["_id"].(string)
-        log.Println("Session", id, "timeout.")
-        log.Println("Vehicle <" + dId + "> Offline.")
+        logger.Warn("Session", id, "timeout.")
+        logger.Warn("Vehicle <" + dId + "> Offline.")
 
         delete(m.sessions, id)
         m.keenBatch.AddEvent("dronelink", &DLTracker{
@@ -138,7 +138,7 @@ func (m *DroneManager) Listen() {
   defer m.conn.Close()
 
   if err != nil {
-	  log.Println(err)
+	  logger.Error(err)
     panic(err)
   }
 
@@ -146,22 +146,22 @@ func (m *DroneManager) Listen() {
 
   go m.checkTimers()
 
-  log.Println("Listening for vehicles on", m.port)
+  logger.Info("Listening for vehicles on", m.port)
 
   for {
     n,addr,err := m.conn.ReadFromUDP(buf)
     // log.Println("Got a message from", addr, "of size", n)
     if err != nil {
-      log.Println("Error: ",err)
+      logger.Error("Error: ",err)
     }
 
     if n < 8 {
-      log.Println("Warning: Recevied message too small")
+      logger.Warn("Warning: Recevied message too small")
       continue
     }
 
     if decoded, err := dronedp.ParseMsg(buf[0:n]); err != nil {
-      log.Println(err)
+      logger.Error(err)
     } else {
       // Doing this async
       go m.handleMessage(decoded, addr)
@@ -194,7 +194,7 @@ func (m *DroneManager) handleStatusMessage(msg *dronedp.StatusMsg, addr *net.UDP
 
 func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDPAddr) {
   if resp, err := cloud.RequestDroneInfo(msg.Serial, msg.SimId, msg.Email, msg.Password); err != nil {
-    log.Println("Auth failed:", err)
+    logger.Error("Auth failed:", err)
   } else {
 
     var userId string
@@ -228,18 +228,18 @@ func (m *DroneManager) handleStatusConnect(msg *dronedp.StatusMsg, addr *net.UDP
     })
 
     if msg, err := dronedp.GenerateMsg(dronedp.OP_STATUS, sessObj.id, sessObj); err != nil {
-      log.Println("Could not build D2P MSG:", err)
+      logger.Warn("Could not build D2P MSG:", err)
     } else {
       if _, err = m.conn.WriteToUDP(msg, addr); err != nil {
-        log.Println("Network error:", err)
+        logger.Error("Network error:", err)
       } else {
-        log.Println("New session:", sessObj.id)
+        logger.Info("New session:", sessObj.id)
 
         // Create a new Vehicle if it does not already exist.
         if sessObj.veh == nil {
           // Id for API is the same as the mongo Id.
           // TODO add name as well.
-          log.Println("Vehicle Authenticated!")
+          logger.Info("Vehicle Authenticated!")
           dId := sessObj.Drone["_id"].(string)
           sessObj.veh = vehicle.NewVehicle(dId, &sessObj.link)
         }
@@ -259,7 +259,7 @@ func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPA
 
     if time.Now().Sub(sessObj.syncCloud) > 60 * time.Second {
       if resp, err := cloud.RequestDroneInfo(sessObj.auth.Serial, sessObj.auth.SimId, sessObj.auth.Email, sessObj.auth.Pass); err != nil {
-        log.Println("Warning failed to get new drone metadata:", err)
+        logger.Warn("Warning failed to get new drone metadata:", err)
       } else {
         sessObj.Drone = resp.Drone
       }
@@ -267,10 +267,10 @@ func (m *DroneManager) handleStatusUpdate(msg *dronedp.StatusMsg, addr *net.UDPA
     }
 
     if msg, err := dronedp.GenerateMsg(dronedp.OP_STATUS, sessObj.id, sessObj); err != nil {
-      log.Println("Could not build D2P MSG:", err)
+      logger.Warn("Could not build D2P MSG:", err)
     } else {
       if _, err = m.conn.WriteToUDP(msg, addr); err != nil {
-        log.Println("Network error:", err)
+        logger.Error("Network error:", err)
       }
     }
   }
@@ -287,7 +287,7 @@ func (m *DroneManager) handleStatusTerminal(msg *dronedp.TerminalMsg, addr *net.
     //{msg: data.msg, status: data.status,
     //  drone: statusObj.drone, session: sess}
 
-    log.Println("Got terminal on", id)
+    logger.Debug("Got terminal on", id)
 
     sessObj.terminal = msg.Msg
   }
@@ -313,7 +313,7 @@ func (m *DroneManager) UpdateTerminal(id string, enable bool) {
 
   k := m.searchVehicle(id)
   if sess, f := m.sessions[k]; f {
-    log.Println("Setting terminal to", enable, "on", k)
+    logger.Debug("Setting terminal to", enable, "on", k)
     sess.Terminal = enable
 
     if !enable {

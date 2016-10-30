@@ -109,6 +109,8 @@ func NewVehicle(id string, writer io.Writer) *Vehicle {
   // Write logic
   go vehicle.stateHandler()
 
+  // DroneLog(sysId, "Vehicle created!")
+
   return vehicle
 }
 

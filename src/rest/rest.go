@@ -7,7 +7,7 @@ package rest
 
 import (
   "fmt"
-  "log"
+  "logger"
   "net/http"
   "strconv"
   "runtime"
@@ -44,12 +44,12 @@ func NewRestServer(addr int) *RestServer {
 }
 
 func (r *RestServer) handleForward(w http.ResponseWriter, req *http.Request) {
-  log.Println("REQUEST", req.Method, req.URL.Path)
+  logger.Info("REQUEST", req.Method, req.URL.Path)
   http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 302)
 }
 
 func (r *RestServer) whoami(w http.ResponseWriter, req *http.Request) {
-  log.Println("REQUEST", req.Method, req.URL.Path)
+  logger.Info("REQUEST", req.Method, req.URL.Path)
   fmt.Fprintf(w,
     "<html><head><title>%s</title></head><body><h1>%s</h1><p>%s</p></body></html>",
     "Dronesmith Technologies",
@@ -71,12 +71,12 @@ func (r *RestServer) Listen(port int) {
   r.apiMux.HandleFunc(  "/",          r.rootHandler)
   r.apiMux.HandleFunc(  "/whoami",    r.whoami)
 
-  log.Println("API listening on", r.port)
-  log.Fatal(http.ListenAndServe(":" + strconv.Itoa(r.port), r.apiMux))
+  logger.Info("API listening on", r.port)
+  logger.Error(http.ListenAndServe(":" + strconv.Itoa(r.port), r.apiMux))
 }
 
 func (r *RestServer) rootHandler(w http.ResponseWriter, req* http.Request) {
-  log.Println("REQUEST", req.Method, req.URL.Path)
+  logger.Info("REQUEST", req.Method, req.URL.Path)
 
   if req.URL.Path != "/" {
     http.Error(w, http.StatusText(404), 404)
