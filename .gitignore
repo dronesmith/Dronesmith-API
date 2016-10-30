@@ -4,6 +4,8 @@
 /bin/mavgen
 /bin/main
 /bin/dslink
+/bin/apicore
+
 pkg/*
 
 .lmon
@@ -17,3 +19,4 @@ pkg/*
 /old/*
 
 flights.zip
+logs/
