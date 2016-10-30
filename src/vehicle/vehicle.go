@@ -2,7 +2,7 @@ package vehicle
 
 import (
   "net"
-  "log"
+  "logger"
   "os"
   "io"
   "fmt"
@@ -13,6 +13,8 @@ import (
   "mavlink/parser"
   "vehicle/api"
 )
+
+var sysId string
 
 type RCInput struct {
   Enabled bool
@@ -46,18 +48,20 @@ type Vehicle struct {
 
 func checkError(err error) {
   if err != nil {
-    log.Println("Error:" , err)
+    logger.Error("Error:" , err)
     os.Exit(1)
   }
 }
 
 func mavParseError(err error) {
   if err != nil {
-    log.Println("Mavlink failed to parse:", err)
+    logger.DroneLog(sysId, "Mavlink failed to parse:", err)
   }
 }
 
 func NewVehicle(id string, writer io.Writer) *Vehicle {
+  sysId = id
+
   // var err error
   vehicle := &Vehicle{}
 
@@ -109,8 +113,6 @@ func NewVehicle(id string, writer io.Writer) *Vehicle {
   // Write logic
   go vehicle.stateHandler()
 
-  // DroneLog(sysId, "Vehicle created!")
-
   return vehicle
 }
 
@@ -121,7 +123,7 @@ func (v *Vehicle) GetParams() {
 func (v *Vehicle) ProcessPacket(pack []byte) {
   packet, err := mavlink.DecodeBytes(pack)
   if err != nil {
-    log.Println("Parser:", err)
+    logger.DroneLog(sysId, "Parser:", err)
   } else {
     v.processPacket(packet)
   }
@@ -141,7 +143,7 @@ func (v *Vehicle) Listen() {
   for {
     packet, err := v.mavlinkReader.Decode()
     if err != nil {
-      log.Println("Parser:", err)
+      logger.DroneLog(sysId, "Parser:", err)
     } else {
       v.processPacket(packet)
     }
@@ -156,7 +158,7 @@ func (v *Vehicle) Close() {
 
 func (v *Vehicle) sendMAVLink(m mavlink.Message) {
   if err := v.mavlinkWriter.Encode(0, 0, m); err != nil {
-    log.Println(err)
+    logger.DroneLog(sysId, err)
   }
 }
 
@@ -207,10 +209,10 @@ func (v *Vehicle) stateHandler() {
       if !caps {
         // Get caps
         v.sendMAVLink(v.api.RequestVehicleInfo())
-        log.Println("Loading vehicle info...")
+        logger.DroneLog(sysId, "Loading vehicle info...")
       } else {
         if !v.api.ParamsInit() {
-          log.Println("Loading params...")
+          logger.DroneLog(sysId, "Loading params...")
           v.GetParams()
           v.ParamsTimer = time.Now()
         } else {
@@ -225,7 +227,7 @@ func (v *Vehicle) stateHandler() {
                   notFound = append(notFound, i)
                 }
               }
-              log.Println("WARN Failed to fetch the following params: ", notFound, "Total:", total)
+              logger.DroneLog(sysId, "WARN Failed to fetch the following params: ", notFound, "Total:", total)
               v.paramsLock.Lock()
               v.missingParams = notFound
               v.paramsLock.Unlock()
@@ -244,7 +246,7 @@ func (v *Vehicle) stateHandler() {
               // wait a teensy bit to give the firmware time to receive
               time.Sleep(5 * time.Millisecond)
             }
-            log.Println(int((float32(foundCnt) / float32(int(total))) * 100), "Percent of params loaded...")
+            logger.DroneLog(sysId, int((float32(foundCnt) / float32(int(total))) * 100), "Percent of params loaded...")
           }
         }
       }
@@ -432,7 +434,7 @@ func (v *Vehicle) processPacket(p *mavlink.Packet) {
     err := m.Unpack(p)
     mavParseError(err)
     v.knownMsgs[m.MsgName()] = &m
-    log.Println(">>>", string(m.Text[:]))
+    logger.DroneLog(sysId, ">>>", string(m.Text[:]))
     v.syslogQueue.Prepend(&api.VehicleLog{
       Msg: string(m.Text[:]),
       Time: time.Now(),

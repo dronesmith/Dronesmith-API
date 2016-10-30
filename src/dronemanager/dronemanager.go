@@ -117,6 +117,7 @@ func (m *DroneManager) checkTimers() {
         logger.Warn("Session", id, "timeout.")
         logger.Warn("Vehicle <" + dId + "> Offline.")
 
+        logger.CloseLog(dId)
         delete(m.sessions, id)
         m.keenBatch.AddEvent("dronelink", &DLTracker{
           Env: KEEN_ENV,

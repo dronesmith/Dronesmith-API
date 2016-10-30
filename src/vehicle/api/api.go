@@ -4,7 +4,7 @@ package api
 import (
   "time"
   "sync"
-  "log"
+  "logger"
   "fmt"
   // "encoding/hex"
   "strconv"
@@ -250,7 +250,7 @@ func (v *VehicleApi) GetMASLAlt() float32 {
 }
 
 func NewVehicleApi(id string) *VehicleApi {
-  log.Println("Vehicle <" + id + "> Init")
+  logger.DroneLog(id, "Vehicle <" + id + "> Init")
   api := &VehicleApi{}
   api.id = id
   api.sysId = 0
@@ -280,7 +280,7 @@ func (v *VehicleApi) UpdateSubSystem(name string) error {
   } else {
     if !subsystem.Online {
       subsystem.Online = true
-      log.Println("Subsystem", name, "online.")
+      logger.DroneLog(v.id, "Subsystem", name, "online.")
     }
     subsystem.Updated = time.Now()
     return nil
@@ -306,7 +306,7 @@ func (v *VehicleApi) CheckSubSystems() {
   for name, subsystem := range v.subSystems {
     if (subsystem.Online) && (time.Now().Sub(subsystem.Updated) > 5 * time.Second) {
       subsystem.Online = false
-      log.Println("Subsystem", name, "offline.")
+      logger.DroneLog(v.id, "Subsystem", name, "offline.")
     }
   }
 }
@@ -351,7 +351,7 @@ func (v *VehicleApi) CheckSysOnline() {
 
   if v.status.Online && (time.Now().Sub(v.info.LastUpdate) > 5 * time.Second) {
     v.status.Online = false
-    log.Println("FMU Offline")
+    logger.DroneLog(v.id, "FMU Offline")
   }
 }
 
@@ -362,7 +362,7 @@ func (v *VehicleApi) UpdateFromHeartbeat(m *mavlink.Heartbeat) {
   if !v.status.Online {
     v.info.LastOnline = time.Now()
     v.status.Online = true
-    log.Println("FMU Online")
+    logger.DroneLog(v.id, "FMU Online")
   }
 
   v.info.LastUpdate = time.Now()
@@ -707,62 +707,62 @@ func (v *VehicleApi) CheckCapability(cap uint64) bool {
 }
 
 func (v *VehicleApi) PrintCapabilities() {
-  log.Println("\t\t\t\t\t[WELCOME TO DSC]")
-  log.Println("Comms Protocol:", v.info.Protocol)
-  log.Println("Vehicle Configuration:", v.info.Type)
-  log.Println("Firmware:", v.info.Firmware)
-  log.Println("Version:", v.fmuGit)
+  logger.DroneLog(v.id, "[WELCOME TO DSC]")
+  logger.DroneLog(v.id, "Comms Protocol:", v.info.Protocol)
+  logger.DroneLog(v.id, "Vehicle Configuration:", v.info.Type)
+  logger.DroneLog(v.id, "Firmware:", v.info.Firmware)
+  logger.DroneLog(v.id, "Version:", v.fmuGit)
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_MISSION_FLOAT) {
-    log.Println("\tCOMMAND LONG SUPPORTED")
+    logger.DroneLog(v.id, "\tCOMMAND LONG SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_PARAM_FLOAT) {
-    log.Println("\tFLOAT PARAMS SUPPORTED")
+    logger.DroneLog(v.id, "\tFLOAT PARAMS SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_MISSION_INT) {
-    log.Println("\tMISSION INT SUPPORTED")
+    logger.DroneLog(v.id, "\tMISSION INT SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_COMMAND_INT) {
-    log.Println("\tCOMMAND INT SUPPORTED")
+    logger.DroneLog(v.id, "\tCOMMAND INT SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_PARAM_UNION) {
-    log.Println("\tUNION PARAMS SUPPORTED")
+    logger.DroneLog(v.id, "\tUNION PARAMS SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_FTP) {
-    log.Println("\tFTP FROM NONVOLATILE STORAGE SUPPORTED")
+    logger.DroneLog(v.id, "\tFTP FROM NONVOLATILE STORAGE SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_SET_ATTITUDE_TARGET) {
-    log.Println("\tATTITUDE TARGET SETPOINTS SUPPORTED")
+    logger.DroneLog(v.id, "\tATTITUDE TARGET SETPOINTS SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED) {
-    log.Println("\tLOCAL POSITION TARGET SETPOINTS SUPPORTED")
+    logger.DroneLog(v.id, "\tLOCAL POSITION TARGET SETPOINTS SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT) {
-    log.Println("\tGLOBAL POSITION TARGET SETPOINTS SUPPORTED")
+    logger.DroneLog(v.id, "\tGLOBAL POSITION TARGET SETPOINTS SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_TERRAIN) {
-    log.Println("\tTERRAIN ESTIMATION SUPPORTED")
+    logger.DroneLog(v.id, "\tTERRAIN ESTIMATION SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_SET_ACTUATOR_TARGET) {
-    log.Println("\tMOTOR TARGET SETPOINTS SUPPORTED")
+    logger.DroneLog(v.id, "\tMOTOR TARGET SETPOINTS SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION) {
-    log.Println("\tFLIGHT TERMINATION SUPPORTED")
+    logger.DroneLog(v.id, "\tFLIGHT TERMINATION SUPPORTED")
   }
 
   if v.CheckCapability(mavlink.MAV_PROTOCOL_CAPABILITY_COMPASS_CALIBRATION) {
-    log.Println("\tCOMPASS CALIBRATION SUPPORTED")
+    logger.DroneLog(v.id, "\tCOMPASS CALIBRATION SUPPORTED")
   }
 }
 
@@ -779,16 +779,16 @@ func (v *VehicleApi) UpdateFromAck(m *mavlink.CommandAck, queue *utils.PQueue) {
 
   switch m.Result {
   case mavlink.MAV_RESULT_ACCEPTED:
-    log.Println("Command Accepted:", m.Command)
+    logger.DroneLog(v.id, "Command Accepted:", m.Command)
   case mavlink.MAV_RESULT_TEMPORARILY_REJECTED:
-    log.Println("Command Rejected:", m.Command)
+    logger.DroneLog(v.id, "Command Rejected:", m.Command)
   case mavlink.MAV_RESULT_DENIED:
-    log.Println("Command Can not be completed:", m.Command)
+    logger.DroneLog(v.id, "Command Can not be completed:", m.Command)
   default: fallthrough
   case mavlink.MAV_RESULT_UNSUPPORTED:
-    log.Println("Command Unknown:", m.Command)
+    logger.DroneLog(v.id, "Command Unknown:", m.Command)
   case mavlink.MAV_RESULT_FAILED:
-    log.Println("Tried to execute command, but failed", m.Command)
+    logger.DroneLog(v.id, "Tried to execute command, but failed", m.Command)
   }
 }
 

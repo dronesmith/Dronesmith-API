@@ -25,12 +25,11 @@ var (
 
 func init() {
   logs = make(map[string]*droneLog)
-  log.Println(LOG_DIR + time.Now().Format(time.RFC3339) + ".log")
-  globalLogFile, _ = os.Create(LOG_DIR + time.Now().Format(time.RFC3339) + ".log")
+  globalLogFile, _ = os.Create(LOG_DIR + "sys-" + time.Now().Format(time.RFC3339) + ".log")
   globalLogger = log.New(globalLogFile, "[API] ", log.LstdFlags)
 }
 
-func LogDrone(name string, vals... interface{}) {
+func DroneLog(name string, vals... interface{}) {
   lock.Lock()
   defer lock.Unlock()
   if dl, f := logs[name]; f {
@@ -38,11 +37,11 @@ func LogDrone(name string, vals... interface{}) {
   } else {
     dl = &droneLog{}
 
-    if file, err := os.Create(LOG_DIR + time.Now().Format(time.RFC3339) + ".log"); err != nil {
+    if file, err := os.Create(LOG_DIR + "drone-" + name + ".log"); err != nil {
       Error("Failed to create log file for " + name + ". Reason:", err)
     } else {
       dl.file = file
-      dl.logger = log.New(dl.file, "[DRONE-" + name + "]", log.LstdFlags)
+      dl.logger = log.New(dl.file, "[DRONE-" + name + "] ", log.LstdFlags)
       logs[name] = dl
     }
   }
