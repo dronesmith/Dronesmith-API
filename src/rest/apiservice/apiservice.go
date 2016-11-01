@@ -10,7 +10,7 @@
  *
  * Proprietary and confidential.
  */
- 
+
 package apiservice
 
 import (
@@ -107,6 +107,12 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     if s != "" {
       filteredPath = append(filteredPath, s)
     }
+  }
+
+  if filteredPath[0] == "drones" && req.Method == "GET" {
+    jsonObj := api.manager.GetOnlineVehicles()
+    api.SendAPIJSON(jsonObj, &w)
+    return
   }
 
   // Just drone, send back all drones associated with user.

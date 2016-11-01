@@ -79,6 +79,7 @@ func (r *RestServer) Listen(port int) {
   r.droneApi = apiservice.NewDroneAPI(uint(port))
 
   r.apiMux.Handle(      "/drone/",    r.droneApi)
+  r.apiMux.Handle(      "/drones",    r.droneApi)
   r.apiMux.HandleFunc(  "/user/",     r.handleForward)
   r.apiMux.HandleFunc(  "/mission/",  r.handleForward)
   r.apiMux.HandleFunc(  "/",          r.rootHandler)
@@ -90,6 +91,7 @@ func (r *RestServer) Listen(port int) {
 
 func (r *RestServer) rootHandler(w http.ResponseWriter, req* http.Request) {
   logger.Info("REQUEST", req.Method, req.URL.Path)
+  logger.Info("Note: This is the default handler")
 
   if req.URL.Path != "/" {
     http.Error(w, http.StatusText(404), 404)

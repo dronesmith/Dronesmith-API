@@ -377,6 +377,25 @@ func (m *DroneManager) searchVehicle(id string) uint32 {
   return 0
 }
 
+func (m *DroneManager) GetOnlineVehicles() map[string]interface{} {
+  m.sessionLock.Lock()
+  defer m.sessionLock.Unlock()
+
+  vehs := make(map[string]interface{})
+
+  for _, session := range m.sessions {
+    name := session.Drone["name"].(string)
+    if name != "" {
+      vehs[name] = session.State
+    } else {
+      id := session.Drone["_id"].(string)
+      vehs[id] = session.State
+    }
+  }
+
+  return vehs
+}
+
 func (m *DroneManager) FindVehicle(id string) *vehicle.Vehicle {
   m.sessionLock.Lock()
   defer m.sessionLock.Unlock()
