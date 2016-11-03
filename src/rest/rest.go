@@ -79,7 +79,7 @@ func (r *RestServer) Listen(port int) {
   r.droneApi = apiservice.NewDroneAPI(uint(port))
 
   r.apiMux.Handle(      "/drone/",    r.droneApi)
-  r.apiMux.Handle(      "/drones",    r.droneApi)
+  // r.apiMux.Handle(      "/drones",    r.droneApi)
   r.apiMux.HandleFunc(  "/user/",     r.handleForward)
   r.apiMux.HandleFunc(  "/mission/",  r.handleForward)
   r.apiMux.HandleFunc(  "/",          r.rootHandler)
