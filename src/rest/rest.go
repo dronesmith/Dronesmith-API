@@ -45,12 +45,12 @@ func init() {
 }
 
 type RestServer struct {
-  port int
+  addr string
   apiMux *http.ServeMux
   droneApi *apiservice.DroneAPI
 }
 
-func NewRestServer(addr int) *RestServer {
+func NewRestServer(addr string) *RestServer {
   return &RestServer{
     addr, nil, nil,
   }
@@ -74,9 +74,9 @@ func (r *RestServer) whoami(w http.ResponseWriter, req *http.Request) {
       "<br>Proudly crafted with ♥ in "+LOC+"<br>System was last launched at "+initTime.String())
 }
 
-func (r *RestServer) Listen(port int) {
+func (r *RestServer) Listen(dsAddr string) {
   r.apiMux = http.NewServeMux()
-  r.droneApi = apiservice.NewDroneAPI(uint(port))
+  r.droneApi = apiservice.NewDroneAPI(dsAddr)
 
   r.apiMux.Handle(      "/drone/",    r.droneApi)
   // r.apiMux.Handle(      "/drones",    r.droneApi)
@@ -85,8 +85,8 @@ func (r *RestServer) Listen(port int) {
   r.apiMux.HandleFunc(  "/",          r.rootHandler)
   r.apiMux.HandleFunc(  "/whoami",    r.whoami)
 
-  logger.Info("API listening on", r.port)
-  logger.Error(http.ListenAndServe(":" + strconv.Itoa(r.port), r.apiMux))
+  logger.Info("API listening on", r.addr)
+  logger.Error(http.ListenAndServe(r.addr, r.apiMux))
 }
 
 func (r *RestServer) rootHandler(w http.ResponseWriter, req* http.Request) {

@@ -16,7 +16,7 @@ package dronemanager
 import (
   "logger"
   "os"
-  "strconv"
+  // "strconv"
   "net"
   "cloud"
   "time"
@@ -52,7 +52,7 @@ type SessAuth struct {
 }
 
 type DroneManager struct {
-  port uint
+  addr string
   keenBatch *keen.BatchClient
   sessions map[uint32]*Session
   sessionLock sync.RWMutex
@@ -109,11 +109,11 @@ func CheckError(err error) {
     }
 }
 
-func NewDroneManager(port uint) *DroneManager {
+func NewDroneManager(addr string) *DroneManager {
   rand.Seed(time.Now().UTC().UnixNano())
   keenClient := &keen.Client{WriteKey: KEEN_WRITE, ProjectID: KEEN_ID}
   return &DroneManager{
-    port,
+    addr,
     keen.NewBatchClient(keenClient, 10 * time.Second),
     make(map[uint32]*Session),
     sync.RWMutex{},
@@ -144,7 +144,7 @@ func (m *DroneManager) checkTimers() {
 }
 
 func (m *DroneManager) Listen() {
-  ServerAddr,err := net.ResolveUDPAddr("udp", ":" + strconv.Itoa(int(m.port)))
+  ServerAddr,err := net.ResolveUDPAddr("udp", m.addr)
   CheckError(err)
 
   m.conn, err = net.ListenUDP("udp", ServerAddr)
@@ -160,7 +160,7 @@ func (m *DroneManager) Listen() {
 
   go m.checkTimers()
 
-  logger.Info("Listening for vehicles on", m.port)
+  logger.Info("Listening for vehicles on", m.addr)
 
   for {
     n,addr,err := m.conn.ReadFromUDP(buf)

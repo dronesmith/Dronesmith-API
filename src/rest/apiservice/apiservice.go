@@ -30,17 +30,17 @@ import (
 )
 
 type DroneAPI struct {
-  port uint
+  addr string
   manager *dronemanager.DroneManager
   idRgxp *regexp.Regexp
   nameRgxp *regexp.Regexp
   spltRgxp *regexp.Regexp
 }
 
-func NewDroneAPI(port uint) *DroneAPI {
+func NewDroneAPI(addr string) *DroneAPI {
   api := &DroneAPI{}
-  api.port = port
-  api.manager = dronemanager.NewDroneManager(api.port)
+  api.addr = addr
+  api.manager = dronemanager.NewDroneManager(api.addr)
 
   api.idRgxp = regexp.MustCompile("[a-z0-9]{24}")
   api.nameRgxp = regexp.MustCompile("[A-Za-z0-9-]{5,24}")
