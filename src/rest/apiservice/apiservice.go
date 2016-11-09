@@ -480,6 +480,13 @@ func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]int
 func (api *DroneAPI) handleLand(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   params := [7]float32{}
   // home := veh.GetHome()
+  loc := veh.GetGlobal()
+  useRel := false
+
+  if postData["relative"] != nil {
+    val := postData["relative"].(bool)
+    useRel = val
+  }
 
   if postData["heading"] != nil {
     val := postData["heading"].(float64)
@@ -488,14 +495,27 @@ func (api *DroneAPI) handleLand(veh *vehicle.Vehicle, postData map[string]interf
 
   if postData["lat"] != nil {
     val := postData["lat"].(float64)
-    params[4] = float32(val)
+
+    if useRel {
+      params[4] = loc["Latitude"] + float32(val)
+    } else {
+      params[4] = float32(val)
+    }
+  } else {
+    params[4] = loc["Latitude"]
   }
 
-  if postData["long"] != nil {
-    val := postData["long"].(float64)
-    params[5] = float32(val)
-  }
+  if postData["lon"] != nil {
+    val := postData["lon"].(float64)
 
+    if useRel {
+      params[5] = loc["Longitude"] + float32(val)
+    } else {
+      params[5] = float32(val)
+    }
+  } else {
+    params[5] = loc["Longitude"]
+  }
   veh.DoGenericCommand(mavlink.MAV_CMD_NAV_LAND, params)
   api.commandBlock(veh, mavlink.MAV_CMD_NAV_LAND, w)
 }
@@ -503,8 +523,14 @@ func (api *DroneAPI) handleLand(veh *vehicle.Vehicle, postData map[string]interf
 func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   params := [7]float32{}
   loc := veh.GetGlobal()
+  useRel := false
 
   veh.SetModeAndArm(true, false, "Hold", true)
+
+  if postData["relative"] != nil {
+    val := postData["relative"].(bool)
+    useRel = val
+  }
 
   if postData["speed"] != nil {
     val := postData["speed"].(float64)
@@ -520,21 +546,36 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
 
   if postData["altitude"] != nil {
     val := postData["altitude"].(float64)
-    params[6] = float32(val) + veh.GetMASLAlt()
+
+    if useRel {
+      params[6] = float32(val) + veh.GetMASLAlt()
+    } else {
+      params[6] = float32(val)
+    }
   } else {
     params[6] = veh.GetMASLAlt()
   }
 
   if postData["lat"] != nil {
     val := postData["lat"].(float64)
-    params[4] = float32(val) + loc["Latitude"]
+
+    if useRel {
+      params[4] = loc["Latitude"] + float32(val)
+    } else {
+      params[4] = float32(val)
+    }
   } else {
     params[4] = loc["Latitude"]
   }
 
   if postData["lon"] != nil {
     val := postData["lon"].(float64)
-    params[5] = float32(val) + loc["Longitude"]
+
+    if useRel {
+      params[5] = loc["Longitude"] + float32(val)
+    } else {
+      params[5] = float32(val)
+    }
   } else {
     params[5] = loc["Longitude"]
   }
@@ -545,9 +586,15 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
 
 func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   params := [7]float32{}
-  home := veh.GetHome()
+  global := veh.GetGlobal()
+  useRel := false
 
   veh.SetModeAndArm(true, true, "Takeoff", true)
+
+  if postData["relative"] != nil {
+    val := postData["relative"].(bool)
+    useRel = val
+  }
 
   if postData["heading"] != nil {
     val := postData["heading"].(float64)
@@ -556,23 +603,39 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
 
   if postData["altitude"] != nil {
     val := postData["altitude"].(float64)
-    params[6] = float32(val) + home["Altitude"]
+
+    if useRel {
+      params[6] = float32(val) + veh.GetMASLAlt()
+    } else {
+      params[6] = float32(val)
+    }
   } else {
-    params[6] = 10 + home["Altitude"]
+    params[6] = 10 + veh.GetMASLAlt()
   }
+
+  println(veh.GetMASLAlt())
 
   if postData["lat"] != nil {
     val := postData["lat"].(float64)
-    params[4] = float32(val)
+
+    if useRel {
+      params[4] = global["Latitude"] + float32(val)
+    } else {
+      params[4] = float32(val)
+    }
   } else {
-    params[4] = home["Latitude"]
+    params[4] = global["Latitude"]
   }
 
-  if postData["long"] != nil {
-    val := postData["long"].(float64)
-    params[5] = float32(val)
+  if postData["lon"] != nil {
+    val := postData["lon"].(float64)
+    if useRel {
+      params[5] = global["Longitude"] + float32(val)
+    } else {
+      params[5] = float32(val)
+    }
   } else {
-    params[5] = home["Longitude"]
+    params[5] = global["Longitude"]
   }
 
   veh.DoGenericCommand(mavlink.MAV_CMD_NAV_TAKEOFF, params)

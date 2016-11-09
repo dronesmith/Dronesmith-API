@@ -258,7 +258,7 @@ func (v *VehicleApi) GetHome() map[string]float32 {
 func (v *VehicleApi) GetMASLAlt() float32 {
   v.lock.Lock()
   defer v.lock.Unlock()
-  return v.target.Altitude
+  return v.gps.Altitude
 }
 
 func NewVehicleApi(id string) *VehicleApi {
