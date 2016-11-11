@@ -32,7 +32,7 @@ import (
 
 const (
   LOC = "New York City, USA"
-  VER = "1.0.01"
+  VER = "1.0.02"
 )
 
 var (
