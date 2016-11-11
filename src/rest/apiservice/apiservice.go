@@ -22,6 +22,7 @@ import (
   "encoding/json"
   "time"
   "strconv"
+  "strings"
 
   "mavlink/parser"
   "cloud"
@@ -201,6 +202,8 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
       return
     }
     defer req.Body.Close()
+
+    toLowerJSON(pdata)
 
     switch filteredPath[2] {
     case "arm": api.handleArmDisarm(veh, true, &w)
@@ -684,4 +687,11 @@ func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.Respons
   // data["Status"] = "FAIL"
   data["Command"] = cmd
   api.SendAPIJSON(data, w)
+}
+
+func toLowerJSON(data map[string]interface{}) {
+  for str, _ := range data {
+    nstr := strings.ToLower(str)
+    data[nstr] = data[str]
+  }
 }
