@@ -145,7 +145,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   // If nil, vehicle isn't online.
   if veh == nil {
     droneData["online"] = false
-    api.SendAPIJSON(droneData, &w)
+    api.SendAPIError(fmt.Errorf("Drone not online."), &w)
     return
   } else {
     droneData["online"] = true
@@ -480,42 +480,44 @@ func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]int
 func (api *DroneAPI) handleLand(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   params := [7]float32{}
   // home := veh.GetHome()
-  loc := veh.GetGlobal()
-  useRel := false
-
-  if postData["relative"] != nil {
-    val := postData["relative"].(bool)
-    useRel = val
-  }
-
-  if postData["heading"] != nil {
-    val := postData["heading"].(float64)
-    params[3] = float32(val)
-  }
-
-  if postData["lat"] != nil {
-    val := postData["lat"].(float64)
-
-    if useRel {
-      params[4] = loc["Latitude"] + float32(val)
-    } else {
-      params[4] = float32(val)
-    }
-  } else {
-    params[4] = loc["Latitude"]
-  }
-
-  if postData["lon"] != nil {
-    val := postData["lon"].(float64)
-
-    if useRel {
-      params[5] = loc["Longitude"] + float32(val)
-    } else {
-      params[5] = float32(val)
-    }
-  } else {
-    params[5] = loc["Longitude"]
-  }
+  // loc := veh.GetGlobal()
+  // useRelPos := false
+  //
+  // if postData["relativePos"] != nil {
+  //   val := postData["relativePos"].(bool)
+  //   useRelPos = val
+  // }
+  //
+  // if postData["heading"] != nil {
+  //   val := postData["heading"].(float64)
+  //   params[3] = float32(val)
+  // }
+  //
+  // if postData["lat"] != nil {
+  //   val := postData["lat"].(float64)
+  //
+  //   if useRelPos {
+  //     params[4] = loc["Latitude"] + float32(val)
+  //   } else {
+  //     params[4] = float32(val)
+  //   }
+  // } else {
+  //   params[4] = loc["Latitude"]
+  // }
+  //
+  // if postData["lon"] != nil {
+  //   val := postData["lon"].(float64)
+  //
+  //   if useRelPos {
+  //     params[5] = loc["Longitude"] + float32(val)
+  //   } else {
+  //     params[5] = float32(val)
+  //   }
+  // } else {
+  //   params[5] = loc["Longitude"]
+  // }
+  //
+  // params[6] = veh.GetMASLAlt()
   veh.DoGenericCommand(mavlink.MAV_CMD_NAV_LAND, params)
   api.commandBlock(veh, mavlink.MAV_CMD_NAV_LAND, w)
 }
@@ -523,13 +525,19 @@ func (api *DroneAPI) handleLand(veh *vehicle.Vehicle, postData map[string]interf
 func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   params := [7]float32{}
   loc := veh.GetGlobal()
-  useRel := false
+  useRelPos := false
+  useRelAlt := true
 
   veh.SetModeAndArm(true, false, "Hold", true)
 
-  if postData["relative"] != nil {
-    val := postData["relative"].(bool)
-    useRel = val
+  if postData["relativeAlt"] != nil {
+    val := postData["relativeAlt"].(bool)
+    useRelAlt = val
+  }
+
+  if postData["relativePos"] != nil {
+    val := postData["relativePos"].(bool)
+    useRelPos = val
   }
 
   if postData["speed"] != nil {
@@ -547,7 +555,7 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
   if postData["altitude"] != nil {
     val := postData["altitude"].(float64)
 
-    if useRel {
+    if useRelAlt {
       params[6] = float32(val) + veh.GetMASLAlt()
     } else {
       params[6] = float32(val)
@@ -559,7 +567,7 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
   if postData["lat"] != nil {
     val := postData["lat"].(float64)
 
-    if useRel {
+    if useRelPos {
       params[4] = loc["Latitude"] + float32(val)
     } else {
       params[4] = float32(val)
@@ -571,7 +579,7 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
   if postData["lon"] != nil {
     val := postData["lon"].(float64)
 
-    if useRel {
+    if useRelPos {
       params[5] = loc["Longitude"] + float32(val)
     } else {
       params[5] = float32(val)
@@ -587,13 +595,19 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
 func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   params := [7]float32{}
   global := veh.GetGlobal()
-  useRel := false
+  useRelPos := false
+  useRelAlt := true
 
   veh.SetModeAndArm(true, true, "Takeoff", true)
 
-  if postData["relative"] != nil {
-    val := postData["relative"].(bool)
-    useRel = val
+  if postData["relativePos"] != nil {
+    val := postData["relativePos"].(bool)
+    useRelPos = val
+  }
+
+  if postData["relativeAlt"] != nil {
+    val := postData["relativeAlt"].(bool)
+    useRelAlt = val
   }
 
   if postData["heading"] != nil {
@@ -604,7 +618,7 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
   if postData["altitude"] != nil {
     val := postData["altitude"].(float64)
 
-    if useRel {
+    if useRelAlt {
       params[6] = float32(val) + veh.GetMASLAlt()
     } else {
       params[6] = float32(val)
@@ -613,12 +627,10 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
     params[6] = 10 + veh.GetMASLAlt()
   }
 
-  println(veh.GetMASLAlt())
-
   if postData["lat"] != nil {
     val := postData["lat"].(float64)
 
-    if useRel {
+    if useRelPos {
       params[4] = global["Latitude"] + float32(val)
     } else {
       params[4] = float32(val)
@@ -629,7 +641,7 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
 
   if postData["lon"] != nil {
     val := postData["lon"].(float64)
-    if useRel {
+    if useRelPos {
       params[5] = global["Longitude"] + float32(val)
     } else {
       params[5] = float32(val)
@@ -651,14 +663,17 @@ func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.Respons
     }
     time.Sleep(250 * time.Millisecond)
 
-    if op, ack := veh.GetLastSuccessfulCmd(); op == int(cmd) {
+    if op, ack, num := veh.GetLastSuccessfulCmd(); op == int(cmd) {
       // data["Status"] = "OK"
       data["Status"] = ack
       data["Command"] = cmd
-      logger.Debug("Nulling last successful cmd")
-      veh.NullLastSuccessfulCmd()
-      api.SendAPIJSON(data, w)
-      return
+      data["StatusCode"] = num
+      if num != 10 {
+        // logger.Debug("Nulling last successful cmd")
+        veh.NullLastSuccessfulCmd()
+        api.SendAPIJSON(data, w)
+        return
+      }
     } else {
       data["Status"] = ack
     }

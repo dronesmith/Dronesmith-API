@@ -10,7 +10,7 @@
  *
  * Proprietary and confidential.
  */
- 
+
 package vehicle
 
 import (
@@ -185,6 +185,7 @@ func (v *Vehicle) sysOnlineHandler() {
     cmdInt, _ := v.commandQueue.Head()
     cmd := cmdInt.(*api.VehicleCommand)
     v.commandSync.Lock()
+    v.commandLast = int(cmd.Command.Command)
     v.commandLastInfo = int(cmd.Status)
     v.commandSync.Unlock()
     if cmd.Status == mavlink.MAV_RESULT_ACCEPTED {
@@ -588,7 +589,7 @@ func (v *Vehicle) GetSysLog() []*api.VehicleLog {
   return log
 }
 
-func (v *Vehicle) GetLastSuccessfulCmd() (int, string) {
+func (v *Vehicle) GetLastSuccessfulCmd() (int, string, int) {
   v.commandSync.RLock()
   defer v.commandSync.RUnlock()
 
@@ -602,7 +603,7 @@ func (v *Vehicle) GetLastSuccessfulCmd() (int, string) {
   default: str = "Command unknown."
   }
 
-  return v.commandLast, str
+  return v.commandLast, str, v.commandLastInfo
 }
 
 func (v *Vehicle) NullLastSuccessfulCmd() {

@@ -795,7 +795,7 @@ func (v *VehicleApi) UpdateFromAck(m *mavlink.CommandAck, queue *utils.PQueue) {
   case mavlink.MAV_RESULT_TEMPORARILY_REJECTED:
     logger.DroneLog(v.id, "Command Rejected:", m.Command)
   case mavlink.MAV_RESULT_DENIED:
-    logger.DroneLog(v.id, "Command Can not be completed:", m.Command)
+    logger.DroneLog(v.id, "Command Cannot be completed:", m.Command)
   default: fallthrough
   case mavlink.MAV_RESULT_UNSUPPORTED:
     logger.DroneLog(v.id, "Command Unknown:", m.Command)
