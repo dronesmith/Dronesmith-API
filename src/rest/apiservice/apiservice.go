@@ -32,14 +32,16 @@ import (
 
 type DroneAPI struct {
   addr string
+  localMode bool
   manager *dronemanager.DroneManager
   idRgxp *regexp.Regexp
   nameRgxp *regexp.Regexp
   spltRgxp *regexp.Regexp
 }
 
-func NewDroneAPI(addr string) *DroneAPI {
+func NewDroneAPI(addr string, isLocal bool) *DroneAPI {
   api := &DroneAPI{}
+  api.localMode = isLocal
   api.addr = addr
   api.manager = dronemanager.NewDroneManager(api.addr)
 
@@ -116,14 +118,19 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     return
   }
 
-  // Just drone, send back all drones associated with user.
-  if len(filteredPath) < 2 {
-    if data, err := cloud.RequestAPIGET("/api/drone/", email, key); err != nil {
-      api.SendAPIError(err, &w)
-    } else {
-      api.SendAPIJSON(data, &w)
+  if !api.localMode {
+    // Just drone, send back all drones associated with user.
+    if len(filteredPath) < 2 {
+      if data, err := cloud.RequestAPIGET("/api/drone/", email, key); err != nil {
+        api.SendAPIError(err, &w)
+      } else {
+        api.SendAPIJSON(data, &w)
+      }
+      return
     }
-    return
+  } else {
+    // Local mode only: send the status page back
+    http.Redirect("/index/status", 304)
   }
 
   // TODO match with name.
@@ -134,14 +141,20 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
   // Make sure user key and email are valid
   var droneData map[string]interface{}
-  var found bool
-  if found, droneData = api.Validate(email, key, filteredPath[1]); !found {
-    api.Send403(&w)
-    return
-  }
+  var veh *Vehicle
 
-  // Grab vehicle object for "live" data.
-  veh := api.manager.FindVehicle(filteredPath[1])
+  if !api.localMode {
+    var found bool
+    if found, droneData = api.Validate(email, key, filteredPath[1]); !found {
+      api.Send403(&w)
+      return
+    }
+
+    // Grab vehicle object for "live" data.
+    veh = api.manager.FindVehicle(filteredPath[1])
+  } else {
+    veh = api.GetLocalVehicle()
+  }
 
   // If nil, vehicle isn't online.
   if veh == nil {
@@ -234,8 +247,8 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     default: api.Send404(&w)
     }
   } else {
-    // forward
-    http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 301)
+    // 404 error
+    return api.Send404(&w)
   }
 }
 
