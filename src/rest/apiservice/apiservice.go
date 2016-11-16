@@ -16,6 +16,7 @@ package apiservice
 import (
   "logger"
   "fmt"
+  "io"
   "math"
   "net/http"
   "regexp"
@@ -34,22 +35,33 @@ type DroneAPI struct {
   addr string
   localMode bool
   manager *dronemanager.DroneManager
+  localVehicle *vehicle.Vehicle
   idRgxp *regexp.Regexp
   nameRgxp *regexp.Regexp
   spltRgxp *regexp.Regexp
 }
 
-func NewDroneAPI(addr string, isLocal bool) *DroneAPI {
+func NewDroneAPI(addr string, isLocal bool, writer io.Writer) *DroneAPI {
   api := &DroneAPI{}
   api.localMode = isLocal
   api.addr = addr
-  api.manager = dronemanager.NewDroneManager(api.addr)
+
+  if !api.localMode {
+    api.manager = dronemanager.NewDroneManager(api.addr)
+  } else {
+    // create local vehicle
+    api.localVehicle = vehicle.NewVehicle("local", writer)
+  }
 
   api.idRgxp = regexp.MustCompile("[a-z0-9]{24}")
   api.nameRgxp = regexp.MustCompile("[A-Za-z0-9-]{5,24}")
   api.spltRgxp = regexp.MustCompile("/")
 
-  go api.manager.Listen()
+  if !api.localMode {
+    go api.manager.Listen()
+  } else {
+
+  }
 
   return api
 }
@@ -130,7 +142,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     }
   } else {
     // Local mode only: send the status page back
-    http.Redirect("/index/status", 304)
+    http.Redirect(w, req, "/index/status", 304)
   }
 
   // TODO match with name.
@@ -141,7 +153,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
   // Make sure user key and email are valid
   var droneData map[string]interface{}
-  var veh *Vehicle
+  var veh *vehicle.Vehicle
 
   if !api.localMode {
     var found bool
@@ -153,7 +165,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     // Grab vehicle object for "live" data.
     veh = api.manager.FindVehicle(filteredPath[1])
   } else {
-    veh = api.GetLocalVehicle()
+    veh = api.localVehicle
   }
 
   // If nil, vehicle isn't online.
@@ -248,7 +260,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     }
   } else {
     // 404 error
-    return api.Send404(&w)
+    api.Send404(&w)
   }
 }
 

@@ -76,7 +76,7 @@ func (r *RestServer) whoami(w http.ResponseWriter, req *http.Request) {
 
 func (r *RestServer) Listen(dsAddr string) {
   r.apiMux = http.NewServeMux()
-  r.droneApi = apiservice.NewDroneAPI(dsAddr, false)
+  r.droneApi = apiservice.NewDroneAPI(dsAddr, false, nil)
 
   r.apiMux.Handle(      "/drone/",    r.droneApi)
   // r.apiMux.Handle(      "/drones",    r.droneApi)
