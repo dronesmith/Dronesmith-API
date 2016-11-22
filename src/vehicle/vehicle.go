@@ -118,6 +118,8 @@ func NewVehicle(id string, writer io.Writer) *Vehicle {
   //   vehicle.mavlinkWriter = mavlink.NewEncoder(remoteConn)
   // }
 
+  vehicle.NullLastSuccessfulCmd()
+
   go vehicle.RCInputListener()
 
   // Check systems are online
@@ -600,7 +602,8 @@ func (v *Vehicle) GetLastSuccessfulCmd() (int, string, int) {
   case mavlink.MAV_RESULT_UNSUPPORTED: str = "Command is not supported."
   case mavlink.MAV_RESULT_DENIED: str = "Command was rejected by the vehicle."
   case mavlink.MAV_RESULT_TEMPORARILY_REJECTED: str = "Command was rejected by the vehicle, but is supported."
-  default: str = "Command unknown."
+  case 10: str = "Command timed out."
+  default: str = "Command failed to be received."
   }
 
   return v.commandLast, str, v.commandLastInfo
@@ -609,7 +612,7 @@ func (v *Vehicle) GetLastSuccessfulCmd() (int, string, int) {
 func (v *Vehicle) NullLastSuccessfulCmd() {
   v.commandSync.Lock()
   defer v.commandSync.Unlock()
-  v.commandLast = 0
+  v.commandLast = 10
   v.commandLastInfo = -1
 }
 
