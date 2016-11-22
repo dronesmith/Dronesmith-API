@@ -558,13 +558,13 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
 
   veh.SetModeAndArm(true, false, "Hold", true)
 
-  if postData["relativeAlt"] != nil {
-    val := postData["relativeAlt"].(bool)
+  if postData["relativealt"] != nil {
+    val := postData["relativealt"].(bool)
     useRelAlt = val
   }
 
-  if postData["relativePos"] != nil {
-    val := postData["relativePos"].(bool)
+  if postData["relativepos"] != nil {
+    val := postData["relativepos"].(bool)
     useRelPos = val
   }
 
@@ -628,13 +628,13 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
 
   veh.SetModeAndArm(true, true, "Takeoff", true)
 
-  if postData["relativePos"] != nil {
-    val := postData["relativePos"].(bool)
+  if postData["relativepos"] != nil {
+    val := postData["relativepos"].(bool)
     useRelPos = val
   }
 
-  if postData["relativeAlt"] != nil {
-    val := postData["relativeAlt"].(bool)
+  if postData["relativealt"] != nil {
+    val := postData["relativealt"].(bool)
     useRelAlt = val
   }
 
