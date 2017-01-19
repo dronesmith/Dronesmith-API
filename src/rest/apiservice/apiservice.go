@@ -16,6 +16,7 @@ package apiservice
 import (
   "logger"
   "fmt"
+  "io"
   "math"
   "net/http"
   "regexp"
@@ -32,22 +33,35 @@ import (
 
 type DroneAPI struct {
   addr string
+  localMode bool
   manager *dronemanager.DroneManager
+  localVehicle *vehicle.Vehicle
   idRgxp *regexp.Regexp
   nameRgxp *regexp.Regexp
   spltRgxp *regexp.Regexp
 }
 
-func NewDroneAPI(addr string) *DroneAPI {
+func NewDroneAPI(addr string, isLocal bool, writer io.Writer) *DroneAPI {
   api := &DroneAPI{}
+  api.localMode = isLocal
   api.addr = addr
-  api.manager = dronemanager.NewDroneManager(api.addr)
+
+  if !api.localMode {
+    api.manager = dronemanager.NewDroneManager(api.addr)
+  } else {
+    // create local vehicle
+    api.localVehicle = vehicle.NewVehicle("local", writer)
+  }
 
   api.idRgxp = regexp.MustCompile("[a-z0-9]{24}")
   api.nameRgxp = regexp.MustCompile("[A-Za-z0-9-]{5,24}")
   api.spltRgxp = regexp.MustCompile("/")
 
-  go api.manager.Listen()
+  if !api.localMode {
+    go api.manager.Listen()
+  } else {
+
+  }
 
   return api
 }
@@ -116,20 +130,26 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     return
   }
 
-  if filteredPath[1] == "*" && req.Method == "GET" {
-    jsonObj := api.manager.GetAllVehicleData()
-    api.SendAPIJSON(jsonObj, &w)
-    return
-  }
+  if !api.localMode {
 
-  // Just drone, send back all drones associated with user.
-  if len(filteredPath) < 2 {
-    if data, err := cloud.RequestAPIGET("/api/drone/", email, key); err != nil {
-      api.SendAPIError(err, &w)
-    } else {
-      api.SendAPIJSON(data, &w)
+    if filteredPath[1] == "*" && req.Method == "GET" {
+      jsonObj := api.manager.GetAllVehicleData()
+      api.SendAPIJSON(jsonObj, &w)
+      return
     }
-    return
+
+    // Just drone, send back all drones associated with user.
+    if len(filteredPath) < 2 {
+      if data, err := cloud.RequestAPIGET("/api/drone/", email, key); err != nil {
+        api.SendAPIError(err, &w)
+      } else {
+        api.SendAPIJSON(data, &w)
+      }
+      return
+    }
+  } else {
+    // Local mode only: send the status page back
+    http.Redirect(w, req, "/index/status", 304)
   }
 
   // TODO match with name.
@@ -140,14 +160,20 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
   // Make sure user key and email are valid
   var droneData map[string]interface{}
-  var found bool
-  if found, droneData = api.Validate(email, key, filteredPath[1]); !found {
-    api.Send403(&w)
-    return
-  }
+  var veh *vehicle.Vehicle
 
-  // Grab vehicle object for "live" data.
-  veh := api.manager.FindVehicle(filteredPath[1])
+  if !api.localMode {
+    var found bool
+    if found, droneData = api.Validate(email, key, filteredPath[1]); !found {
+      api.Send403(&w)
+      return
+    }
+
+    // Grab vehicle object for "live" data.
+    veh = api.manager.FindVehicle(filteredPath[1])
+  } else {
+    veh = api.localVehicle
+  }
 
   // If nil, vehicle isn't online.
   if veh == nil {
@@ -240,8 +266,8 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     default: api.Send404(&w)
     }
   } else {
-    // forward
-    http.Redirect(w, req, cloud.CLOUD_ADDR + "/api" + req.URL.Path, 301)
+    // 404 error
+    api.Send404(&w)
   }
 }
 
@@ -539,13 +565,13 @@ func (api *DroneAPI) handleGuided(veh *vehicle.Vehicle, postData map[string]inte
 
   veh.SetModeAndArm(true, false, "Hold", true)
 
-  if postData["relativeAlt"] != nil {
-    val := postData["relativeAlt"].(bool)
+  if postData["relativealt"] != nil {
+    val := postData["relativealt"].(bool)
     useRelAlt = val
   }
 
-  if postData["relativePos"] != nil {
-    val := postData["relativePos"].(bool)
+  if postData["relativepos"] != nil {
+    val := postData["relativepos"].(bool)
     useRelPos = val
   }
 
@@ -609,13 +635,13 @@ func (api *DroneAPI) handleTakeoff(veh *vehicle.Vehicle, postData map[string]int
 
   veh.SetModeAndArm(true, true, "Takeoff", true)
 
-  if postData["relativePos"] != nil {
-    val := postData["relativePos"].(bool)
+  if postData["relativepos"] != nil {
+    val := postData["relativepos"].(bool)
     useRelPos = val
   }
 
-  if postData["relativeAlt"] != nil {
-    val := postData["relativeAlt"].(bool)
+  if postData["relativealt"] != nil {
+    val := postData["relativealt"].(bool)
     useRelAlt = val
   }
 
@@ -685,6 +711,7 @@ func (api *DroneAPI) commandBlock(veh *vehicle.Vehicle, cmd int, w *http.Respons
       }
     } else {
       data["Status"] = ack
+      data["StatusCode"] = num
     }
 
     attempts++
