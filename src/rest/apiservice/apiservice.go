@@ -116,6 +116,12 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     return
   }
 
+  if filteredPath[1] == "*" && req.Method == "GET" {
+    jsonObj := api.manager.GetAllVehicleData()
+    api.SendAPIJSON(jsonObj, &w)
+    return
+  }
+
   // Just drone, send back all drones associated with user.
   if len(filteredPath) < 2 {
     if data, err := cloud.RequestAPIGET("/api/drone/", email, key); err != nil {
