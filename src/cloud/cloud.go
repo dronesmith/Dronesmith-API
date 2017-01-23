@@ -21,6 +21,10 @@ import (
   // "log"
 )
 
+const (
+  W3W_API_KEY = "BXIP296D"
+)
+
 var (
   CLOUD_ADDR string
 )
@@ -88,6 +92,50 @@ func RequestAPIGET(url, email, key string) (map[string]interface{}, error) {
   } else {
     req.Header.Set("User-Email", email)
     req.Header.Set("User-Key", key)
+
+    if res, err := client.Do(req); err != nil {
+      return nil, err
+    } else {
+      switch res.StatusCode {
+      case 200:
+        decoder := json.NewDecoder(res.Body)
+        t := make(map[string]interface{})
+        err := decoder.Decode(&t)
+        if err != nil {
+          return nil, err
+        }
+        defer res.Body.Close()
+
+        return t, nil
+      default: // anything but 200
+        decoder := json.NewDecoder(res.Body)
+        t := map[string]string {
+          "error": "",
+        }
+        err := decoder.Decode(&t)
+        if err != nil {
+            return nil, err
+        }
+        defer res.Body.Close()
+
+        return nil, fmt.Errorf(t["error"])
+      }
+    }
+  }
+}
+
+func RequestW3WGET(lat float32, lon float32) (map[string]interface{}, error) {
+  client := &http.Client{}
+
+  latStr := ""
+  lonStr := ""
+
+  if req, err := http.NewRequest("GET",
+    "api.what3words.com/v2/reverse?coords="
+    +latStr+","+lonStr+"&key="+W3W_API_KEY
+    +"&lang=en&format=json&display=full", nil); err != nil {
+    return nil, err
+  } else {
 
     if res, err := client.Do(req); err != nil {
       return nil, err

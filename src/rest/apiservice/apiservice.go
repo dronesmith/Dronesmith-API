@@ -66,6 +66,10 @@ func NewDroneAPI(addr string, isLocal bool, writer io.Writer) *DroneAPI {
   return api
 }
 
+func (api *DroneAPI) W3WForwardLookUp(w3w string) (lat float32, lon float32) {
+  return cloud.W3WForwardLookup(w3w)
+}
+
 func (api *DroneAPI) Send404(w *http.ResponseWriter) {
   (*w).WriteHeader(http.StatusNotFound)
 }
@@ -356,6 +360,10 @@ func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]int
     lon = float64(home["Longitude"])
   }
 
+  if postData["What3words"] == {
+    lat, lon = W3WForwardLookUp(postData["What3words"])
+  }
+
   if postData["alt"] != nil {
     alt = postData["alt"].(float64)
   } else {
@@ -385,6 +393,12 @@ func (api *DroneAPI) handleLog(veh *vehicle.Vehicle, w *http.ResponseWriter) {
 
 func (api *DroneAPI) handleTelem(kind string, data map[string]interface{}, w *http.ResponseWriter) {
   val, found := data[kind]
+
+  // What 3 Words for position and gps
+  if kind == "gps" || kind == "position" {
+    conv := cloud.RequestW3WGET(data[kind]["latitude"], data[kind]["longitude"])
+    val["What3words"] = conv
+  }
 
   if found {
     api.SendAPIJSON(val, w)
@@ -498,6 +512,10 @@ func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]int
     return
   } else {
     cmd = postData["command"].(float64)
+  }
+
+  if postData["What3words"] == {
+    lat, lon = W3WForwardLookUp(postData["What3words"])
   }
 
   if postData["args"] != nil {
