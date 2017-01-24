@@ -84,6 +84,7 @@ type Position struct {
   Longitude float32
   Altitude  float32
   Heading   float32
+  What3words string 
 }
 
 //

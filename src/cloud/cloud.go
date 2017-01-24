@@ -18,7 +18,8 @@ import (
   "encoding/json"
   "fmt"
   "net/http"
-  // "log"
+  "strconv"
+  // "logger"
 )
 
 const (
@@ -124,21 +125,20 @@ func RequestAPIGET(url, email, key string) (map[string]interface{}, error) {
   }
 }
 
-func RequestW3WGET(lat float32, lon float32) (map[string]interface{}, error) {
+func W3WGET(lat float64, lon float64) (string, error) {
   client := &http.Client{}
 
-  latStr := ""
-  lonStr := ""
+  latStr := strconv.FormatFloat(lat, 'E', -1, 64)
+  lonStr := strconv.FormatFloat(lon, 'E', -1, 64)
 
-  if req, err := http.NewRequest("GET",
-    "api.what3words.com/v2/reverse?coords="
-    +latStr+","+lonStr+"&key="+W3W_API_KEY
-    +"&lang=en&format=json&display=full", nil); err != nil {
-    return nil, err
+  if req, err := http.NewRequest("GET", "https://api.what3words.com/v2/reverse?coords=" +
+    latStr+","+lonStr+"&key="+W3W_API_KEY +
+    "&lang=en&format=json&display=full", nil); err != nil {
+    return "", err
   } else {
 
     if res, err := client.Do(req); err != nil {
-      return nil, err
+      return "", err
     } else {
       switch res.StatusCode {
       case 200:
@@ -146,11 +146,13 @@ func RequestW3WGET(lat float32, lon float32) (map[string]interface{}, error) {
         t := make(map[string]interface{})
         err := decoder.Decode(&t)
         if err != nil {
-          return nil, err
+          return "", err
         }
         defer res.Body.Close()
 
-        return t, nil
+        wordsStr := t["words"].(string)
+
+        return wordsStr, nil
       default: // anything but 200
         decoder := json.NewDecoder(res.Body)
         t := map[string]string {
@@ -158,11 +160,11 @@ func RequestW3WGET(lat float32, lon float32) (map[string]interface{}, error) {
         }
         err := decoder.Decode(&t)
         if err != nil {
-            return nil, err
+            return "", err
         }
         defer res.Body.Close()
 
-        return nil, fmt.Errorf(t["error"])
+        return "", fmt.Errorf(t["error"])
       }
     }
   }

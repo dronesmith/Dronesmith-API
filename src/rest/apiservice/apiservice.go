@@ -29,6 +29,7 @@ import (
   "cloud"
   "dronemanager"
   "vehicle"
+  CoreApi "vehicle/api"
 )
 
 type DroneAPI struct {
@@ -66,9 +67,9 @@ func NewDroneAPI(addr string, isLocal bool, writer io.Writer) *DroneAPI {
   return api
 }
 
-func (api *DroneAPI) W3WForwardLookUp(w3w string) (lat float32, lon float32) {
-  return cloud.W3WForwardLookup(w3w)
-}
+// func (api *DroneAPI) W3WForwardLookUp(w3w string) (lat float32, lon float32) {
+//   return cloud.W3WForwardLookup(w3w)
+// }
 
 func (api *DroneAPI) Send404(w *http.ResponseWriter) {
   (*w).WriteHeader(http.StatusNotFound)
@@ -211,6 +212,7 @@ func (api *DroneAPI) ServeHTTP(w http.ResponseWriter, req *http.Request) {
     case "rates": api.handleTelem("Rates", chunk, &w)
     case "target": api.handleTelem("Target", chunk, &w)
     case "sensors": api.handleTelem("Sensors", chunk, &w)
+    case "what3words": api.handleW3W(chunk, &w)
     case "home": api.handleTelem("Home", chunk, &w)
     case "log": api.handleLog(veh, &w)
     case "param":
@@ -343,6 +345,24 @@ func (api *DroneAPI) handleTerminal(w *http.ResponseWriter, id string, enable bo
 
 }
 
+func (api *DroneAPI) handleW3W(data map[string]interface{}, w *http.ResponseWriter) {
+  val, found := data["Position"]
+
+  if found {
+    // if this fails, there's something wrong with the core engine!
+    pos := val.(CoreApi.Position)
+
+    if conv, err := cloud.W3WGET(float64(pos.Latitude), float64(pos.Longitude)); err != nil {
+      api.SendAPIError(err, w)
+    } else {
+      pos.What3words = conv
+      api.SendAPIJSON(pos, w)
+    }
+  } else {
+    api.SendAPIError(fmt.Errorf("Could get position data."), w)
+  }
+}
+
 func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]interface{}, w *http.ResponseWriter) {
   home := veh.GetHome()
 
@@ -360,9 +380,9 @@ func (api *DroneAPI) handleSetHome(veh *vehicle.Vehicle, postData map[string]int
     lon = float64(home["Longitude"])
   }
 
-  if postData["What3words"] == {
-    lat, lon = W3WForwardLookUp(postData["What3words"])
-  }
+  // if postData["What3words"] == {
+  //   lat, lon = W3WForwardLookUp(postData["What3words"])
+  // }
 
   if postData["alt"] != nil {
     alt = postData["alt"].(float64)
@@ -393,12 +413,6 @@ func (api *DroneAPI) handleLog(veh *vehicle.Vehicle, w *http.ResponseWriter) {
 
 func (api *DroneAPI) handleTelem(kind string, data map[string]interface{}, w *http.ResponseWriter) {
   val, found := data[kind]
-
-  // What 3 Words for position and gps
-  if kind == "gps" || kind == "position" {
-    conv := cloud.RequestW3WGET(data[kind]["latitude"], data[kind]["longitude"])
-    val["What3words"] = conv
-  }
 
   if found {
     api.SendAPIJSON(val, w)
@@ -514,9 +528,9 @@ func (api *DroneAPI) handleCommand(veh *vehicle.Vehicle, postData map[string]int
     cmd = postData["command"].(float64)
   }
 
-  if postData["What3words"] == {
-    lat, lon = W3WForwardLookUp(postData["What3words"])
-  }
+  // if postData["What3words"] == {
+  //   lat, lon = W3WForwardLookUp(postData["What3words"])
+  // }
 
   if postData["args"] != nil {
     args := postData["args"].([]interface{})
